@@ -74,3 +74,7 @@ ggplot2::ggplot(data_plot_amount, aes(x = amount_tsh))+
 mean(data_plot_amount$amount_tsh)
 min(data_plot_amount$amount_tsh)
 max(data_plot_amount$amount_tsh)
+
+
+source("CreateTrainingData.r")
+TrainingData$status_group
