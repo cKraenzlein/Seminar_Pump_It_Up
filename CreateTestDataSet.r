@@ -1,47 +1,37 @@
 # Load necessary packages
 library(readr)
 library(dplyr)
-library(here)
 # Set the working directory to the location of the script
 here::here()
 # Load the test data
 TestData <- readr::read_csv("TestData.csv")
-
-# Remov some variables that are not needed for the analysis and format the data, order some factors
-TestData_factor_ordered <- TestData %>% 
-    select(amount_tsh, gps_height, longitude, latitude, region, population, construction_year, extraction_type,
-           management_group, payment, quality_group, quantity, source_type, source_class, waterpoint_type, installer, extraction_type_class) %>%
-    mutate(waterpoint_type = as.factor(waterpoint_type), # amount of water available
-           source_type = as.factor(source_type), # The source of the water, since the variable wasnt that important in the first model, 
-                                       # we use source_type because it has less levels
-           source_class = as.factor(source_class), # were the water is "stored", groundwater or surface, maybe drop this
-           quantity = factor(quantity, ordered = TRUE, levels = c("enough", "seasonal", "insufficient", "dry", "unknown")), 
-           # quantity of water available / quantity = quantity_group
-           quality_group = factor(quality_group, ordered = TRUE, levels = c("good", "milky", "colored", "fluoride", "salty", "unknown")), 
-           # quality of the water, fewer levels than water_quality, in the first model we used water_quality
-                                                     # but the variable was not that important                     
-           payment = factor(payment, ordered = TRUE, levels = c("pay per bucket", "pay monthly", "pay annually", "pay when scheme fails", "other", "unknown", "never pay")), 
-           # What the water costs / payment_type = payment the level names are different but the variable is the same
-           management_group = as.factor(management_group), # How the waterpoint is managed / management_group has less levels than management, not that important in first model
-           extraction_type = as.factor(extraction_type), # The kind of extraction method used
-           extraction_type_class = as.factor(extraction_type_class), # The kind of extraction method used, fewer levels than extraction_type
-           region = as.factor(region), # 21 regions: islands and some small regions (fewer residents) are not included
-           installer = as.factor(installer))
-
-# Replace NA values in installer with "unknown"
-TestData_factor_ordered$installer <- as.character(TestData_factor_ordered$installer)
-TestData_factor_ordered$installer[is.na(TestData_factor_ordered$installer)] <- "unknown"
-# Convert installer back to factor
-TestData_factor_ordered$installer <- as.factor(TestData_factor_ordered$installer)
-
-Id <- TestData$id
-
-
-
-# Formatted Installer for Test Data
+# Source Trainings Data for mean_construction_year and Top25_installers and mean_logitude and mean_latitude
 source("CreateTrainingData.r")
+# Save Id column for later use
+Id <- TestData$id
+# Fromat the test data
+ TestData <-  TestData %>%
+    left_join(Mean_Location, by = c("region", "district_code"))
 
-TestData_FormattedInstaller <- TestData_factor_ordered %>%
-    mutate(installer = as.character(installer)) %>%
-    mutate(installer = ifelse(installer %in% Top25_installers$installer, installer, "other")) %>%
-    mutate(installer = as.factor(installer))
+TestData_Formatted <- TestData %>%
+    select(-payment, -region_code, -quantity_group, -scheme_management, -extraction_type, -water_quality) %>% # Take the Training data and remove all duplicate/redundant features
+    select(-id, -funder, -wpt_name, -num_private, -subvillage, -lga, -ward, -recorded_by, -scheme_name) %>% # Remove Features that have too many levels or are not needed for the analysis
+    mutate(year_recorded = as.numeric(format(date_recorded, "%Y"))) %>%
+    mutate(month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
+    select(-date_recorded) %>%
+    mutate(across(where(is.character), as.factor)) %>%
+    mutate(permit = ifelse(permit, "yes", ifelse(!permit, "no", "unknown")), # Convert permit to factor with levels yes, no, unknown
+           permit = ifelse(is.na(permit), "unknown", permit), # Replace NA values in permit with "unknown"
+           public_meeting = ifelse(public_meeting, "yes", ifelse(!public_meeting, "no", "unknown")), # Convert public_meeting to factor with levels yes, no, unknown
+           public_meeting = ifelse(is.na(public_meeting), "unknown", public_meeting), # Replace NA values in public_meeting with "unknown"
+           construction_year = ifelse(construction_year == 0, median_construction_year, construction_year), # Replace missing values in construction_year with the median of the known values
+           mean_longitude = ifelse(longitude != 0, longitude, mean_longitude), # Replace missing values in longitude with the mean of the known values
+           mean_latitude = ifelse(latitude != 2e-8, latitude, mean_latitude), # Replace missing values in latitude with the mean of the known values
+           installer = as.character(installer)) %>% # Convert installer to character
+    mutate(installer = ifelse(installer %in% Top25_installers$installer, installer, "other")) %>% # Replace installers not in the top 25 with "other"
+    select(-longitude, -latitude) %>% # Remove longitude and latitude, because they are replaced by mean_longitude and mean_latitude
+    mutate(payment_type = factor(payment_type, ordered = TRUE, levels = c("per bucket", "monthly", "annually", "on failure", "other", "unknown", "never pay")), # Convert payment_type to factor with ordered levels
+           permit = factor(permit), # Convert permit to factor with ordered levels
+           public_meeting = factor(public_meeting), # Convert public_meeting to factor with ordered levels
+           installer = as.factor(installer), # Convert installer to factor
+           district_code = as.factor(district_code)) # Convert district_code to factor
