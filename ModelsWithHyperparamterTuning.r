@@ -29,42 +29,55 @@ Test_Data <- TestData_Formatted
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
+future::plan("multisession", workers = 3)
 # Define the task
-task_RF <- as_task_classif(Data, target = "status_group")
+task_RF_Hyper <- as_task_classif(Data, target = "status_group")
 # Define the learner and the tuning spaces
-learner_RF = as_learner(ppl("robustify") %>>% lrn("classif.ranger",
-  num.trees  = to_tune(p_int(500, 2000)),
-  mtry = to_tune(p_int(2, 26)),
-  min.node.size = to_tune(p_int(1, 10)),
-  splitrule = to_tune(p_fct(c("gini", "extratrees"))),
+learner_RF = lrn("classif.ranger",
+  num.trees  = 800,
+  mtry = 6,
+  min.node.size = to_tune(p_int(1,11)),
+  splitrule = "gini",
   num.threads = 5
-))
+)
 # Define the tuning instance
 instance_RF = ti(
-  task = task_RF,
+  task = task_RF_Hyper,
   learner = learner_RF,
-  resampling = rsmp("cv", folds = 3),
+  resampling = rsmp("cv", folds = 5),
   measures = msr("classif.acc"),
   terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
-                                 trm("evals", n_evals = 150)), any = TRUE)
+                                 trm("evals", n_evals = 11)), any = TRUE)
 )
-tuner_RF = tnr("random_search")
+tuner_RF = tnr("grid_search", batch_size = 11)
 # Tune the hyperparameters
 tuner_RF$optimize(instance_RF)
 # Result:
 instance_RF$result$learner_param_vals
-# min.node.size = 8
-# mtry = 25
-# num.trees = 1500
+# min.node.size = 4
+# mtry = 5
+# num.trees = 736
+# splitrule = "gini"
+# -----------------------
+# Smaller Sample size
+# min.node.size = 7
+# mtry = 6
+# num.trees = 591
+# splitrule = "gini"
+# -----------------------
+# Smaller Sample size
+# min.node.size = 4
+# mtry = 6
+# num.trees = 500
 # splitrule = "gini"
 
 # Visualize the tuning results
 autoplot(instance_RF)
 
-Tuning_RF_numtrees <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "classif.ranger.num.trees"))
-Tuning_kknn_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "classif.ranger.min.node.size"))
-Tuning_kknn_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "classif.ranger.mtry"))
-Tuning_kknn_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "classif.ranger.splitrule"))
+Tuning_RF_numtrees <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_num.trees"))
+Tuning_kknn_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_min.node.size"))
+Tuning_kknn_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_mtry"))
+Tuning_kknn_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_splitrule"))
 
 Tuning_RF_numtrees <- Tuning_RF_numtrees +
   labs(x = "number trees", y = "Accuracy") +
@@ -74,94 +87,33 @@ Tuning_RF_numtrees <- Tuning_RF_numtrees +
 Tuning_kknn_minnodesize <- Tuning_kknn_minnodesize +
   labs(x = "min node size", y = "Accuracy") +
   theme_bw() +
-  scale_x_continuous(breaks = seq(1, 10, by = 2)) +
+  scale_x_continuous(breaks = seq(1, 11, by = 2)) +
   theme(legend.position = "none")
 
 Tuning_kknn_mtry <- Tuning_kknn_mtry +
   labs(x = "mtry", y = "Accuracy") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  scale_x_continuous(breaks = seq(2, 26, by = 3))
 
 Tuning_kknn_splitrule <- Tuning_kknn_splitrule +
   labs(x = "splitrule", y = "Accuracy") +
   theme_bw() 
 
 # Combine the plots
-Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_kknn_mtry + Tuning_RF_numtrees + Tuning_kknn_splitrule +
-  plot_layout(ncol = 2, nrow = 2) +
+Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_RF_numtrees +
+  plot_layout(nrow = 1) +
   plot_annotation(title = "Random Forest Hyperparameter Tuning Results")
 
-ggsave("Tuning_RF.png", plot = Tuning_RF_combined, width = 10, height = 8, dpi = 800)
+ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
-# Second Tuning Grid 
-# Define the learner and the tuning spaces
-learner_RF_2 = as_learner(ppl("robustify") %>>% lrn("classif.ranger",
-  num.trees  = to_tune(p_int(500, 2000)),
-  mtry = to_tune(p_int(15, 26)),
-  min.node.size = to_tune(p_int(1, 10)),
-  splitrule = "gini",
-  num.threads = 8
-))
-# Define the tuning instance
-instance_RF_2 = ti(
-  task = task_RF,
-  learner = learner_RF_2,
-  resampling = rsmp("cv", folds = 5),
-  measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 2.5 * 3600),
-                                 trm("evals", n_evals = 100)), any = TRUE)
-)
-# Tune the hyperparameters
-tuner_RF$optimize(instance_RF_2)
-# Result:
-instance_RF_2$result$learner_param_vals
-# num.trees = 1432, mtry = 26, min.node.size = 5
-
-Tuning_RF_numtrees_2 <- patchwork::wrap_plots(autoplot(instance_RF_2, type = "marginal", cols_x = "classif.ranger.num.trees"))
-Tuning_kknn_minnodesize_2 <- patchwork::wrap_plots(autoplot(instance_RF_2, type = "marginal", cols_x = "classif.ranger.min.node.size"))
-Tuning_kknn_mtry_2 <- patchwork::wrap_plots(autoplot(instance_RF_2, type = "marginal", cols_x = "classif.ranger.mtry"))
-
-
-Tuning_RF_numtrees_2 <- Tuning_RF_numtrees_2 +
-  labs(x = "number trees", y = "Accuracy") +
-  theme_bw() 
-
-Tuning_kknn_minnodesize_2 <- Tuning_kknn_minnodesize_2 +
-  labs(x = "min node size", y = "Accuracy") +
-  theme_bw() +
-  scale_x_continuous(breaks = seq(1, 10, by = 2)) +
-  theme(legend.position = "none")
-
-Tuning_kknn_mtry_2 <- Tuning_kknn_mtry_2 +
-  labs(x = "mtry", y = "Accuracy") +
-  theme_bw() +
-  theme(legend.position = "none") +
-  scale_x_continuous(breaks = seq(15, 26, by = 2))
-
-# Combine the plots
-Tuning_RF_combined_2 <- Tuning_kknn_minnodesize_2 + Tuning_kknn_mtry_2 + Tuning_RF_numtrees_2 + 
-  plot_layout(ncol = 3) +
-  plot_annotation(title = "Random Forest Hyperparameter Tuning Results", 
-                  subtitle = "Performance metric = accuracy, Resampling strategy = CV 5-folds, Random search")
-
-ggsave("Tuning_RF_2_sub.png", plot = Tuning_RF_combined_2, width = 10, height = 4, dpi = 800)
-
-# Visualize the Cross-Validation:
-mtry <- ggplot(as.data.table(instance_RF_2$archive), aes(x = classif.ranger.mtry, y = classif.acc)) +
-  geom_point() +
-  geom_smooth(method = "loess") +
-  theme_bw() +
-  labs(title = "Accuracy vs mtry", y = "Accuracy", x = "mtry")
-
-ggsave("mtry.png", plot = mtry, width = 6, height = 4, dpi = 800)
-# -------------------------- -------------------------------------------------------------------------------------------------
-# Create new learner with the best hyperparameters
+task_RF <- as_task_classif(Data, target = "status_group")
 learner_RF_tuned = lrn("classif.ranger",
-  num.trees  = 1500,
-  mtry = 26,
-  min.node.size = 7,
+  num.trees  = 1000,
+  mtry = 6,
+  min.node.size = 4,
   splitrule = "gini",
-  num.threads = 6,
+  num.threads = 8,
   importance = "permutation"
 )
 # Train the tuned learner
@@ -175,7 +127,7 @@ table(prediction$response)
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "TunedRFtotal.csv", row.names = FALSE)
+write.csv(submission, file = "TunedRFtotal_New.csv", row.names = FALSE)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Importance of the features
 importance_scores = learner_RF_tuned$importance()
@@ -184,26 +136,19 @@ importance_dt = data.table(
     Importance = as.numeric(importance_scores)
   )
 
-names <- c("Menge", "Längengrad", "Breitengrad",
-          "Baujahr", "Zahlungsintervall", "Region",
-          "GPS Höhe", "Antrieb der Pumpe 1", "Art der Förderung 2",
-          "Quelltypen 1", "Art der Förderung 1", "Distrikt Code",
-          "Bevölkerungzahl", "Antrieb der Pumpe 2", "Fördermenge",
-          "Becken", "Genehmigung", "Verwaltungsart",
-          "Quelltypen 2", "Monat erfasst", "Installateur 1",
-          "Quelltypen 3", "Jahr erfasst", "Verwaltungsart 2",
-          "Öffentliche Treffen", "Qualität")
+names <- c("quantity","longitude","latitude","construction year","extraction type 3","payment intervals","GPS height","waterpoint type",
+           "region","extraction type 1","available water","district code","source","waterpoint type 2","population")
 
-importance_dt$Feature = names
+
 # Sort by importance
-importance_dt = importance_dt[order(-Importance)]
+importance_dt = importance_dt[order(-Importance)] %>% head(15)
+importance_dt$Feature = names
 # Visualize
 plot_importance = ggplot(importance_dt, aes(x = reorder(Feature, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   coord_flip() + # Flip coordinates to make it a horizontal bar plot
-  labs(title = "Random Forest Feature Importance",
-        x = "Feature",
-        y = "Permutation Importance") +
+  labs(x = "Feature",
+       y = "Importance") +
   theme_bw()
 
 ggsave("Importance_RF.png", plot = plot_importance, width = 8, height = 5, dpi = 800)
@@ -244,9 +189,9 @@ instance_KKNN_2 = ti(
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
   terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 0.5 * 3600),
-                                 trm("evals", n_evals = 100)), any = TRUE)
+                                 trm("evals", n_evals = 40)), any = TRUE)
 )
-tuner_KKNN = tnr("random_search")
+tuner_KKNN = tnr("grid_search", batch_size = 40)
 # Tune the hyperparameters
 tuner_KKNN$optimize(instance_KKNN)
 tuner_KKNN$optimize(instance_KKNN_2)
@@ -319,8 +264,30 @@ po_ranger_branch = po("learner_cv", lrn("classif.ranger",
                                         mtry = 6,
                                         min.node.size = 3,
                                         splitrule = "gini",
-                                        num.threads = 6)
+                                        num.threads = 6),
                         id = "ranger_base")
+
+numeric_feats = task_stacked$feature_types[type == "numeric", id]
+ordinal_feats = c("payment_type")
+nominal_feats = setdiff(task_stacked$feature_names, c(numeric_feats, ordinal_feats))
+
+nominal_pipe = po("select", id = "select_nominal", selector = selector_name(nominal_feats)) %>>%
+  po("encode", method = "one-hot", id = "encode_nominal")
+ordinal_pipe = po("select", id = "select_ordinal", selector = selector_name(ordinal_feats)) %>>%
+  po("encode", method = "treatment", id = "encode_ordinal")
+numeric_pipe = po("select", id = "select_numeric", selector = selector_name(numeric_feats))
+
+feature_union = gunion(list(nominal_pipe,ordinal_pipe,numeric_pipe)) %>>%
+  po("featureunion", id = "combined_features")
+
+po_xgboost_branch = feature_union %>>% po("learner_cv", lrn("classif.xgboost",
+                                         max_depth = 60,
+                                         eta = 0.019, 
+                                         nrounds = 300, 
+                                         subsample = 0.6791455,
+                                         objective      = "multi:softprob",
+                                         nthread = 5),
+                        id = "xgboost_base")
 
 po_kknn_branch = po("select", selector = selector_name(Features_kknn)) %>>%
                   ppl("robustify") %>>% po("scale") %>>% po("learner_cv", lrn("classif.kknn",
@@ -329,7 +296,7 @@ po_kknn_branch = po("select", selector = selector_name(Features_kknn)) %>>%
                                                                             kernel = "inv"),
                     id = "kknn_base")
 
-base_learner_predictions_graph = gunion(list(po_ranger_branch, po_kknn_branch)) %>>%
+base_learner_predictions_graph = gunion(list(po_ranger_branch, po_kknn_branch, po_xgboost_branch)) %>>%
                           po("featureunion")
 
 super_learner_model = lrn("classif.ranger", id = "super.ranger", num.threads = 6)
