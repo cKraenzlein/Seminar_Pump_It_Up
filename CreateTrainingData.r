@@ -46,8 +46,12 @@ TrainingData_Formatted <- TrainingData %>%
            permit = ifelse(is.na(permit), "unknown", permit), # Replace NA values in permit with "unknown"
            public_meeting = ifelse(public_meeting, "yes", ifelse(!public_meeting, "no", "unknown")), # Convert public_meeting to factor with levels yes, no, unknown
            public_meeting = ifelse(is.na(public_meeting), "unknown", public_meeting), # Replace NA values in public_meeting with "unknown"
-           construction_year = ifelse(construction_year == 0, median(construction_year[construction_year > 0], na.rm = TRUE), construction_year), # Replace missing values in construction_year with the median of the known values
+           construction_year_known = ifelse(construction_year == 0, FALSE, TRUE),
+           construction_year = ifelse(construction_year == 0, median_construction_year, construction_year), # Replace missing values in construction_year with the median of the known values
+           gps_known = ifelse(gps_height == 0, FALSE, TRUE),
            gps_height = ifelse(gps_height == 0, median(gps_height[gps_height > 0], na.rm = TRUE), gps_height), # Replace missing values in gps_height with the median of the known values
+           longitude_known = ifelse(longitude == 0, FALSE, TRUE),
+           latitude_known = ifelse(latitude == 2e-8, FALSE, TRUE),
            mean_longitude = ifelse(longitude != 0, longitude, mean_longitude), # Replace missing values in longitude with the mean of the known values
            mean_latitude = ifelse(latitude != 2e-8, latitude, mean_latitude), # Replace missing values in latitude with the mean of the known values
            installer = as.character(installer)) %>% # Convert installer to character
@@ -65,6 +69,8 @@ TrainingData_Formatted <- TrainingData %>%
         month_recorded %in% c(1, 2) ~ "dry",
         month_recorded %in% c(3, 4, 5) ~ "rainy",
         month_recorded %in% c(6, 7, 8, 9, 10) ~ "dry",
-        month_recorded %in% c(11, 12) ~ "rainy",
-    ))
+        month_recorded %in% c(11, 12) ~ "rainy")) %>%
+    mutate(Season_recorded = as.factor(Season_recorded)) %>%
+    mutate(quantity_known = ifelse(quantity == "unknown", FALSE, TRUE),
+           payment_known = ifelse(payment_type == "unknown", FALSE, TRUE))
 

@@ -34,8 +34,8 @@ future::plan("multisession", workers = 3)
 task_RF_Hyper <- as_task_classif(Data, target = "status_group")
 # Define the learner and the tuning spaces
 learner_RF = lrn("classif.ranger",
-  num.trees  = 800,
-  mtry = 6,
+  num.trees  = to_tune(c(500, 1000, 1500, 2000)),
+  mtry = to_tune(p_int(1,15)),
   min.node.size = to_tune(p_int(1,11)),
   splitrule = "gini",
   num.threads = 5
@@ -44,12 +44,12 @@ learner_RF = lrn("classif.ranger",
 instance_RF = ti(
   task = task_RF_Hyper,
   learner = learner_RF,
-  resampling = rsmp("cv", folds = 5),
+  resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
-                                 trm("evals", n_evals = 11)), any = TRUE)
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 2 * 3600),
+                                 trm("evals", n_evals = 250)), any = TRUE)
 )
-tuner_RF = tnr("grid_search", batch_size = 11)
+tuner_RF = tnr("random_search")
 # Tune the hyperparameters
 tuner_RF$optimize(instance_RF)
 # Result:
@@ -75,43 +75,43 @@ instance_RF$result$learner_param_vals
 autoplot(instance_RF)
 
 Tuning_RF_numtrees <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_num.trees"))
-Tuning_kknn_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_min.node.size"))
-Tuning_kknn_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_mtry"))
-Tuning_kknn_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_splitrule"))
+Tuning_RF_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_min.node.size"))
+Tuning_RF_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_mtry"))
+#Tuning_RF_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_splitrule"))
 
 Tuning_RF_numtrees <- Tuning_RF_numtrees +
   labs(x = "number trees", y = "Accuracy") +
   theme_bw() +
   theme(legend.position = "none")
 
-Tuning_kknn_minnodesize <- Tuning_kknn_minnodesize +
+Tuning_RF_minnodesize <- Tuning_RF_minnodesize +
   labs(x = "min node size", y = "Accuracy") +
   theme_bw() +
   scale_x_continuous(breaks = seq(1, 11, by = 2)) +
   theme(legend.position = "none")
 
-Tuning_kknn_mtry <- Tuning_kknn_mtry +
+Tuning_RF_mtry <- Tuning_RF_mtry +
   labs(x = "mtry", y = "Accuracy") +
   theme_bw() +
   theme(legend.position = "none") +
   scale_x_continuous(breaks = seq(2, 26, by = 3))
 
-Tuning_kknn_splitrule <- Tuning_kknn_splitrule +
-  labs(x = "splitrule", y = "Accuracy") +
-  theme_bw() 
+#Tuning_RF_splitrule <- Tuning_RF_splitrule +
+#  labs(x = "splitrule", y = "Accuracy") +
+#  theme_bw() 
 
 # Combine the plots
-Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_RF_numtrees +
+Tuning_RF_combined <- Tuning_RF_minnodesize + Tuning_RF_numtrees + Tuning_RF_mtry +
   plot_layout(nrow = 1) +
   plot_annotation(title = "Random Forest Hyperparameter Tuning Results")
 
-ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
+ggsave("Tuning_RF_17_08.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
 task_RF <- as_task_classif(Data, target = "status_group")
 learner_RF_tuned = lrn("classif.ranger",
-  num.trees  = 1000,
+  num.trees  = 2000,
   mtry = 6,
-  min.node.size = 4,
+  min.node.size = 5,
   splitrule = "gini",
   num.threads = 8,
   importance = "permutation"
@@ -127,7 +127,7 @@ table(prediction$response)
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "TunedRFtotal_New.csv", row.names = FALSE)
+write.csv(submission, file = "TunedRFtotal_17_08.csv", row.names = FALSE)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Importance of the features
 importance_scores = learner_RF_tuned$importance()
@@ -151,7 +151,7 @@ plot_importance = ggplot(importance_dt, aes(x = reorder(Feature, Importance), y 
        y = "Importance") +
   theme_bw()
 
-ggsave("Importance_RF.png", plot = plot_importance, width = 8, height = 5, dpi = 800)
+ggsave("Importance_RF_17_08.png", plot = plot_importance, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # KKNN with mlr3, Runtime approximately 
 # Define the task
