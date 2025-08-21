@@ -17,18 +17,17 @@ Data_Test_Final <- TestData %>%
     mutate(across(where(is.character), as.factor)) %>% # Convert all character columns to factors
     mutate(district_code = as.factor(district_code)) %>% # Convert district_code  to factors
     mutate(funder = forcats::fct_collapse(funder,
-                unknown = "0", Danida = "Danida", Dhv = "Dhv", 
-                District_Council = "District Council", Dwsp = "Dwsp", Germany_Republi = "Germany Republi",
-                Government_Of_Tanzania = "Government Of Tanzania", Hesawa = "Hesawa", Kkkt = "Kkkt", 
-                Ministry_Of_Water = "Ministry Of Water", Norad = "Norad", Private_Individual = "Private Individual",
-                Rwssp = "Rwssp", Tasaf = "Tasaf", Tcrs = "Tcrs",
-                Unicef = "Unicef", Water = "Water", World_Bank = "World Bank",
-                World_Vision = "World Vision", other_level = "DEPRECATED"), 
+                unknown = c("0"), Dwsp = c("Dwsp"), Dwssp = c("Dwssp"), 
+                Government_Of_Tanzania = c("Government Of Tanzania"), Hesawa = c("Hesawa"), Holland = c("Holland"), 
+                Jica = c("Jica"), Lwi = c("Lwi"), Plan_International = c("Plan International"), 
+                Ridep = c("Ridep"), Rwssp = c("Rwssp"), Tasaf = c("Tasaf"), 
+                Unicef = c("Unicef"), World_Vision = c("World Vision"), Wsdp = c("Wsdp"), 
+                Wvt = c("Wvt"), other_level = "DEPRECATED"), 
            installer = forcats::fct_collapse(installer,
-                unknown = "0", Central_Government = "Central government", CES = "CES",
-                Commu = "Commu", DANIDA = "DANIDA", DWE = "DWE",
-                Government = "Government", Hesawa = "Hesawa", KKKT = "KKKT",
-                RWE = "RWE", TCRS = "TCRS", other_level = "DEPRECATED")) %>%
+                unknown = c("0"), DWE = c("DWE"), Government = c("Government"), Hesawa = "Hesawa",
+                HOLLAND = c("HOLLAND"), JICA = c("JICA"), LWI = c("LWI"), Plan_Internationa = "Plan Internationa",
+                RWE = c("RWE"), TASAF = c("TASAF"), World_Vision = c("World Vision"), WVT = "WVT",
+                other_level = "DEPRECATED")) %>%
     mutate(extraction_type = forcats::fct_collapse(extraction_type_class, 
                 other = c("other", "wind-powered", "rope pump"), 
                 gravity = "gravity",

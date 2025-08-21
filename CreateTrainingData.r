@@ -33,8 +33,17 @@ cleaned_waterpoints <- TrainingData %>%
   slice(1) %>%
   ungroup() %>%
   select(-year_recorded, -month_recorded)
+# Remaining_waterpoints
+remaining_waterpoints <- TrainingData %>%
+  filter(!is.na(longitude) & !is.na(latitude)) %>%
+  mutate(year_recorded = as.numeric(format(date_recorded, "%Y")),
+         month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
+  group_by(longitude, latitude, year_recorded, month_recorded) %>%
+  filter(n() == 1) %>%
+  ungroup() %>%
+  select(-year_recorded, -month_recorded)
 # 3. Combine the cleaned valid coordinates with the original NA rows
-final_waterpoints <- bind_rows(cleaned_waterpoints, na_coords)
+final_waterpoints <- bind_rows(cleaned_waterpoints, na_coords, remaining_waterpoints)
 
 Data_Training_Final <- final_waterpoints %>%
     select(-payment_type, -region_code, -quantity_group) %>% # Remove all duplicate features
@@ -44,18 +53,17 @@ Data_Training_Final <- final_waterpoints %>%
     mutate(across(where(is.character), as.factor)) %>% # Convert all character columns to factors
     mutate(district_code = as.factor(district_code)) %>% # Convert district_code  to factors
     mutate(funder = forcats::fct_collapse(funder,
-                unknown = c("0"), Danida = c("Danida"), Dhv = c("Dhv"), 
-                District_Council = c("District Council"), Dwsp = c("Dwsp"), Germany_Republi = c("Germany Republi"),
-                Government_Of_Tanzania = c("Government Of Tanzania"), Hesawa = c("Hesawa"), Kkkt = c("Kkkt"), 
-                Ministry_Of_Water = c("Ministry Of Water"), Norad = c("Norad"), Private_Individual = c("Private Individual"),
-                Rwssp = c("Rwssp"), Tasaf = c("Tasaf"), Tcrs = c("Tcrs"),
-                Unicef = c("Unicef"), Water = c("Water"), World_Bank = c("World Bank"),
-                World_Vision = c("World Vision"), other_level = "DEPRECATED"), 
+                unknown = c("0"), Dwsp = c("Dwsp"), Dwssp = c("Dwssp"), 
+                Government_Of_Tanzania = c("Government Of Tanzania"), Hesawa = c("Hesawa"), Holland = c("Holland"), 
+                Jica = c("Jica"), Lwi = c("Lwi"), Plan_International = c("Plan International"), 
+                Ridep = c("Ridep"), Rwssp = c("Rwssp"), Tasaf = c("Tasaf"), 
+                Unicef = c("Unicef"), World_Vision = c("World Vision"), Wsdp = c("Wsdp"), 
+                Wvt = c("Wvt"), other_level = "DEPRECATED"), 
            installer = forcats::fct_collapse(installer,
-                unknown = c("0"), Central_Government = c("Central government"), CES = c("CES"),
-                Commu = c("Commu"), DANIDA = c("DANIDA"), DWE = c("DWE"),
-                Government = c("Government"), Hesawa = c("Hesawa"), KKKT = c("KKKT"),
-                RWE = c("RWE"), TCRS = c("TCRS"), other_level = "DEPRECATED")) %>%
+                unknown = c("0"), DWE = c("DWE"), Government = c("Government"), Hesawa = "Hesawa",
+                HOLLAND = c("HOLLAND"), JICA = c("JICA"), LWI = c("LWI"), Plan_Internationa = "Plan Internationa",
+                RWE = c("RWE"), TASAF = c("TASAF"), World_Vision = c("World Vision"), WVT = "WVT",
+                other_level = "DEPRECATED")) %>%
     mutate(extraction_type = forcats::fct_collapse(extraction_type_class, 
                 other = c("other", "wind-powered", "rope pump"), 
                 gravity = "gravity",
