@@ -29,9 +29,9 @@ set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Imputation graph
 imp_num = list(po("missind", type = "integer", affect_columns = selector_name(c("construction_year", "gps_height", "longitude"))) %>>%
-               po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("numeric"), id = "impute_num"))
-imp_factor <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
+               po("imputelearner", learner = lrn("regr.ranger", num.threads = 8), affect_columns = selector_type("numeric"), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("logical"), id = "impute_bin")
 
 imp_all <- imp_num %>>% imp_factor %>>% imp_bin
 # --------------------------------------------------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ instance_RF = ti(
   learner = learner_RF,
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 4 * 3600),
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
                                  trm("evals", n_evals = 100)), any = TRUE)
 )
 tuner_RF = tnr("random_search")
@@ -116,29 +116,35 @@ ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, heigh
 # -------------------------- -------------------------------------------------------------------------------------------------
 task_RF <- as_task_classif(Data, target = "status_group")
 learner_RF_tuned = lrn("classif.ranger",
-  #num.trees  = 1000,
-  #mtry = 6,
-  #min.node.size = 10,
+  num.trees  = 1000,
+  mtry = 5,
+  min.node.size = 2,
   num.threads = 8,
-  #splitrule = "gini",
+  splitrule = "gini",
   importance = "impurity"
 )
 # Train the tuned learner
-graph_learner = as_learner(imp_all %>>% learner_RF_tuned)
-graph_learner$train(task_RF)
+graph_learner_hyp = as_learner(imp_all %>>% po(lrn("classif.ranger",  
+                                                   num.trees  = 1000,
+                                                   mtry = 5,
+                                                   min.node.size = 2,
+                                                   num.threads = 8,
+                                                   splitrule = "gini",
+                                                   importance = "impurity")))
+graph_learner_hyp$train(task_RF)
 #---------------------------------------------------------------------------------------------------------------------------
 # Predict on the test set
-prediction = graph_learner$predict_newdata(Test_Data)
+prediction = graph_learner_hyp$predict_newdata(Test_Data)
 
 table(prediction$response)
 
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "TunedRFtotal_New_16_08.csv", row.names = FALSE)
+write.csv(submission, file = "TunedRF_22_08.csv", row.names = FALSE)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Importance of the features
-importance_scores = graph_learner$importance()
+importance_scores = graph_learner_hyp$importance()
 importance_dt = data.table(
     Feature = names(importance_scores),
     Importance = as.numeric(importance_scores)
