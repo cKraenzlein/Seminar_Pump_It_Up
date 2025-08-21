@@ -28,7 +28,8 @@ cleaned_waterpoints <- TrainingData %>%
   mutate(year_recorded = as.numeric(format(date_recorded, "%Y")),
          month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
   group_by(longitude, latitude, year_recorded, month_recorded) %>%
-  arrange(pick(everything()), rowSums(is.na(cur_data()))) %>%
+  filter(n() > 1) %>%
+  arrange(rowSums(is.na(across(everything()))), .by_group = TRUE) %>%
   slice(1) %>%
   ungroup() %>%
   select(-year_recorded, -month_recorded)
@@ -75,7 +76,7 @@ Data_Training_Final <- final_waterpoints %>%
            scheme_management = forcats::fct_collapse(scheme_management, 
                 other = c("Other", "None", "SWC", "Trust"), 
                 Company = "Company",
-                Parasental = "Parasental",
+                Parastatal = "Parastatal",
                 Private_operator = "Private operator",
                 VWC = "VWC",
                 Water_authority = "Water authority",
@@ -90,3 +91,4 @@ Data_Training_Final <- final_waterpoints %>%
     mutate(population_log = log(population + 1), # Adding 1 to avoid log(0)
            amount_tsh_log = log(amount_tsh + 1)) %>% # Adding 1 to avoid log(0)
     select(-population, -amount_tsh)
+
