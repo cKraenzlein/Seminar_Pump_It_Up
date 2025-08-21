@@ -1,76 +1,92 @@
 # Load necessary packages
 library(readr)
 library(dplyr)
+library(tidyr)
+library(ggplot2)
 # Set the working directory to the location of the script
 here::here()
 # Read in the Datasets
 TrainingData_Variables <- read_csv("TrainingData_Variables.csv")
 TrainingData_TargetVariable <- read_csv("TrainingData_TargetVariable.csv")
-# Remove missing values from the features longitude, latitude by replacing them with the mean of their repective regions and districts
-Mean_Location <- TrainingData_Variables %>%
-    group_by(region, district_code) %>%
-    summarise(mean_longitude = mean(longitude[longitude != 0], na.rm = TRUE),
-              mean_latitude = mean(latitude[latitude != 2e-8], na.rm = TRUE)) %>%
-    ungroup() %>%
-    group_by(region) %>%
-    mutate(mean_longitude = ifelse(is.na(mean_longitude), mean(mean_longitude, na.rm = TRUE), mean_longitude),
-           mean_latitude = ifelse(is.na(mean_latitude), mean(mean_latitude, na.rm = TRUE), mean_latitude)) %>%
-    ungroup()
-
-TrainingData_Variables <- TrainingData_Variables %>%
-    left_join(Mean_Location, by = c("region", "district_code"))
-
 # Combine the two datasets by the column "id"
-TrainingData <- merge(x = TrainingData_Variables, y = TrainingData_TargetVariable, by = "id")
+TrainingData <- merge(x = TrainingData_Variables, y = TrainingData_TargetVariable, by = "id") %>% 
+    mutate(flag = ifelse(population == 0 & amount_tsh == 0 & construction_year == 0 & gps_height == 0, TRUE, FALSE)) %>%
+    mutate(population = ifelse(flag, NA, population),
+           amount_tsh = ifelse(flag, NA, amount_tsh),
+           gps_height = ifelse(flag, NA, gps_height),
+           construction_year = ifelse(flag, NA, construction_year)) %>%
+    select(-flag) %>%
+    mutate(construction_year = ifelse(construction_year == 0, NA, construction_year), 
+           longitude = ifelse(longitude == 0, NA, longitude),
+           latitude = ifelse(latitude == -2e-8, NA, latitude))
+# 1. Separate the rows with NA coordinates
+na_coords <- TrainingData %>%
+  filter(is.na(longitude) & is.na(latitude))
+# Process the data to remove duplicates based on the lesser number of NAs
+cleaned_waterpoints <- TrainingData %>%
+  filter(!is.na(longitude) & !is.na(latitude)) %>%
+  mutate(year_recorded = as.numeric(format(date_recorded, "%Y")),
+         month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
+  group_by(longitude, latitude, year_recorded, month_recorded) %>%
+  arrange(pick(everything()), rowSums(is.na(cur_data()))) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(-year_recorded, -month_recorded)
+# 3. Combine the cleaned valid coordinates with the original NA rows
+final_waterpoints <- bind_rows(cleaned_waterpoints, na_coords)
 
-# Top 25 installers by the number of installed waterpoints
-Top25_installers <- TrainingData %>%
-    select(installer) %>%
-    group_by(installer) %>%
-    summarise(count = n()) %>%
-    arrange(desc(count)) %>%
-    head(25) %>%
-    ungroup()
-# Median construction year
-median_construction_year <- median(TrainingData$construction_year[TrainingData$construction_year > 0], na.rm = TRUE)
-
-# Training data set
-TrainingData_Formatted <- TrainingData %>%
-    select(-payment, -region_code, -quantity_group, -scheme_management, -extraction_type, -water_quality) %>% # Take the Training data and remove all duplicate/redundant features
-    select(-id, -funder, -wpt_name, -num_private, -subvillage, -lga, -ward, -recorded_by, -scheme_name) %>% # Remove Features that have too many levels or are not needed for the analysis
-    mutate(year_recorded = as.numeric(format(date_recorded, "%Y"))) %>%
-    mutate(month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
-    select(-date_recorded) %>%
-    mutate(across(where(is.character), as.factor)) %>%
-    mutate(permit = ifelse(permit, "yes", ifelse(!permit, "no", "unknown")), # Convert permit to factor with levels yes, no, unknown
-           permit = ifelse(is.na(permit), "unknown", permit), # Replace NA values in permit with "unknown"
-           public_meeting = ifelse(public_meeting, "yes", ifelse(!public_meeting, "no", "unknown")), # Convert public_meeting to factor with levels yes, no, unknown
-           public_meeting = ifelse(is.na(public_meeting), "unknown", public_meeting), # Replace NA values in public_meeting with "unknown"
-           construction_year_known = ifelse(construction_year == 0, FALSE, TRUE),
-           construction_year = ifelse(construction_year == 0, median_construction_year, construction_year), # Replace missing values in construction_year with the median of the known values
-           gps_known = ifelse(gps_height == 0, FALSE, TRUE),
-           gps_height = ifelse(gps_height == 0, median(gps_height[gps_height > 0], na.rm = TRUE), gps_height), # Replace missing values in gps_height with the median of the known values
-           longitude_known = ifelse(longitude == 0, FALSE, TRUE),
-           latitude_known = ifelse(latitude == 2e-8, FALSE, TRUE),
-           mean_longitude = ifelse(longitude != 0, longitude, mean_longitude), # Replace missing values in longitude with the mean of the known values
-           mean_latitude = ifelse(latitude != 2e-8, latitude, mean_latitude), # Replace missing values in latitude with the mean of the known values
-           installer = as.character(installer)) %>% # Convert installer to character
-    mutate(installer = ifelse(installer %in% Top25_installers$installer, installer, "other")) %>% # Replace installers not in the top 25 with "other"
-    select(-longitude, -latitude) %>% # Remove longitude and latitude, because they are replaced by mean_longitude and mean_latitude
-    mutate(payment_type = factor(payment_type, ordered = TRUE, levels = c("per bucket", "monthly", "annually", "on failure", "other", "unknown", "never pay")), # Convert payment_type to factor with ordered levels
-           quantity = factor(quantity, ordered = TRUE, levels = c("dry", "insufficient", "seasonal", "enough", "unknown")), # Convert quantity to factor with ordered levels
-           permit = factor(permit), # Convert permit to factor with ordered levels
-           public_meeting = factor(public_meeting), # Convert public_meeting to factor with ordered levels
-           installer = as.factor(installer), # Convert installer to factor
-           district_code = as.factor(district_code)) %>% # Convert district_code to factor
-    mutate(installer = ifelse(is.na(installer), "other", installer))%>%
-    mutate(installer = as.factor(installer)) %>%
-    mutate(Season_recorded = case_when(
-        month_recorded %in% c(1, 2) ~ "dry",
-        month_recorded %in% c(3, 4, 5) ~ "rainy",
-        month_recorded %in% c(6, 7, 8, 9, 10) ~ "dry",
-        month_recorded %in% c(11, 12) ~ "rainy")) %>%
-    mutate(Season_recorded = as.factor(Season_recorded)) %>%
-    mutate(quantity_known = ifelse(quantity == "unknown", FALSE, TRUE),
-           payment_known = ifelse(payment_type == "unknown", FALSE, TRUE))
-
+Data_Training_Final <- final_waterpoints %>%
+    select(-payment_type, -region_code, -quantity_group) %>% # Remove all duplicate features
+    select(-id, -num_private, -recorded_by, -wpt_name) %>% # Remove unique, almost unique and constant features
+    select(-extraction_type, -extraction_type_group, -water_quality, -source, -waterpoint_type_group, -scheme_name, -management_group, -management) %>% # Remove features that appear more than ones, and have categories that contain less than 5% of the total observations, leave at least one feature
+    select(-subvillage, -ward, -lga) %>% 
+    mutate(across(where(is.character), as.factor)) %>% # Convert all character columns to factors
+    mutate(district_code = as.factor(district_code)) %>% # Convert district_code  to factors
+    mutate(funder = forcats::fct_collapse(funder,
+                unknown = c("0"), Danida = c("Danida"), Dhv = c("Dhv"), 
+                District_Council = c("District Council"), Dwsp = c("Dwsp"), Germany_Republi = c("Germany Republi"),
+                Government_Of_Tanzania = c("Government Of Tanzania"), Hesawa = c("Hesawa"), Kkkt = c("Kkkt"), 
+                Ministry_Of_Water = c("Ministry Of Water"), Norad = c("Norad"), Private_Individual = c("Private Individual"),
+                Rwssp = c("Rwssp"), Tasaf = c("Tasaf"), Tcrs = c("Tcrs"),
+                Unicef = c("Unicef"), Water = c("Water"), World_Bank = c("World Bank"),
+                World_Vision = c("World Vision"), other_level = "DEPRECATED"), 
+           installer = forcats::fct_collapse(installer,
+                unknown = c("0"), Central_Government = c("Central government"), CES = c("CES"),
+                Commu = c("Commu"), DANIDA = c("DANIDA"), DWE = c("DWE"),
+                Government = c("Government"), Hesawa = c("Hesawa"), KKKT = c("KKKT"),
+                RWE = c("RWE"), TCRS = c("TCRS"), other_level = "DEPRECATED")) %>%
+    mutate(extraction_type = forcats::fct_collapse(extraction_type_class, 
+                other = c("other", "wind-powered", "rope pump"), 
+                gravity = "gravity",
+                handpump = "handpump", 
+                motorpump = "motorpump", 
+                submersible = "submersible"), 
+           waterpoint_type = forcats::fct_collapse(waterpoint_type, 
+                other = c("other", "cattle trough", "dam"), 
+                communal_standpipe = "communal standpipe", 
+                improved_spring = "improved spring",
+                communal_standpipe_multiple = "communal standpipe multiple"), 
+            water_quality = forcats::fct_collapse(quality_group, 
+                other = c("colored", "fluoride"), 
+                good = "good", 
+                salty = "salty",
+                milky = "milky",
+                unknown = "unknown"), 
+           scheme_management = forcats::fct_collapse(scheme_management, 
+                other = c("Other", "None", "SWC", "Trust"), 
+                Company = "Company",
+                Parasental = "Parasental",
+                Private_operator = "Private operator",
+                VWC = "VWC",
+                Water_authority = "Water authority",
+                Water_Board = "Water Board",
+                WUA = "WUA",
+                WUG = "WUG")) %>% 
+    select(-extraction_type_class, -quality_group) %>% # Remove original columns
+    mutate(year_recorded = as.numeric(format(date_recorded, "%Y")), # Extract year from date_recorded
+           sin_month = sin(2 * pi * as.numeric(format(date_recorded, "%m")) / 12), # Extract month from date_recorded
+           cos_month = cos(2 * pi * as.numeric(format(date_recorded, "%m")) / 12)) %>%
+    select(-date_recorded) %>% # Remove original date_recorded column 
+    mutate(population_log = log(population + 1), # Adding 1 to avoid log(0)
+           amount_tsh_log = log(amount_tsh + 1)) %>% # Adding 1 to avoid log(0)
+    select(-population, -amount_tsh)
