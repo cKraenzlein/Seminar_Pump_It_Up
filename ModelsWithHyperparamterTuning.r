@@ -28,12 +28,21 @@ str(Test_Data)
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Imputation graph
+<<<<<<< HEAD
 imp_num = list(po("missind", type = "integer", affect_columns = selector_name(c("construction_year", "gps_height", "longitude"))) %>>%
                po("imputelearner", learner = lrn("regr.ranger", num.threads = 8), affect_columns = selector_type("numeric"), id = "impute_num"))
 imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("factor"), id = "impute_factor")
 imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("logical"), id = "impute_bin")
+=======
+imp_num = list(po("missind", type = "numeric"), 
+               po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("numeric"), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
+po_select = po("select", selector = selector_invert(selector_name(c("population_log_missing", "gps_height_missing", "longitude_missing"))))
+>>>>>>> dd2b2665c04fa637304fb8332a234ef28d073f35
 
-imp_all <- imp_num %>>% imp_factor %>>% imp_bin
+imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
+imp_all$plot()
 # --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
 # future::plan("multisession", workers = 3)
