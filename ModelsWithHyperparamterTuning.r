@@ -4,50 +4,57 @@ library(mlr3learners)   # Provides learners like 'classif.ranger'
 library(mlr3filters)    # For feature selection
 library(mlr3viz)        # For plotting
 library(mlr3tuning)     # For hyperparameter tuning
-library(mlr3fselect)    # For feature selection
 library(ranger)         # The underlying Random Forest implementation
-library(iml)            # For model interpretation (including SHAP)
-library(data.table)     # mlr3 often works with data.table
 library(mlr3pipelines)  # For pipelines
 library(ggplot2)        # For plotting
 library(dplyr)          # For data manipulation
 library(patchwork)      # Combining Plots
-
 # Source R file for training data
 here::here()
 # --------------------------------------------------------------------------------------------------------------------------
 # Load the training data
 source("CreateTrainingData.R")
-Data <- TrainingData_Formatted
+Data <- Data_Training_Final
 # --------------------------------------------------------------------------------------------------------------------------
 # Load the test data
 source("CreateTestDataSet.R")
 ID <- Id
-Test_Data <- TestData_Formatted
+Test_Data <- Data_Test_Final
 #---------------------------------------------------------------------------------------------------------------------------
+str(Data)
+nrow(Data)
+str(Test_Data)
 # Set seed for reproducibility
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
+# Imputation graph
+imp_num = list(po("missind", type = "integer", affect_columns = selector_name(c("construction_year", "gps_height", "longitude"))) %>>%
+               po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("numeric"), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
+
+imp_all <- imp_num %>>% imp_factor %>>% imp_bin
+# --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
-future::plan("multisession", workers = 3)
+# future::plan("multisession", workers = 3)
 # Define the task
 task_RF_Hyper <- as_task_classif(Data, target = "status_group")
 # Define the learner and the tuning spaces
-learner_RF = lrn("classif.ranger",
-  num.trees  = to_tune(c(500, 1000, 1500, 2000)),
-  mtry = to_tune(p_int(1,15)),
+learner_RF = as_learner(imp_all %>>% po(lrn("classif.ranger",
+  num.trees  = to_tune(p_int(500,2000)),
+  mtry = to_tune(p_int(1,16)),
   min.node.size = to_tune(p_int(1,11)),
-  splitrule = "gini",
-  num.threads = 5
-)
+  splitrule = to_tune(p_fct(c("gini", "extratrees"))),
+  num.threads = 8
+)))
 # Define the tuning instance
 instance_RF = ti(
   task = task_RF_Hyper,
   learner = learner_RF,
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 2 * 3600),
-                                 trm("evals", n_evals = 250)), any = TRUE)
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 4 * 3600),
+                                 trm("evals", n_evals = 100)), any = TRUE)
 )
 tuner_RF = tnr("random_search")
 # Tune the hyperparameters
@@ -75,62 +82,63 @@ instance_RF$result$learner_param_vals
 autoplot(instance_RF)
 
 Tuning_RF_numtrees <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_num.trees"))
-Tuning_RF_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_min.node.size"))
-Tuning_RF_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_mtry"))
-#Tuning_RF_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_splitrule"))
+Tuning_kknn_minnodesize <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_min.node.size"))
+Tuning_kknn_mtry <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_mtry"))
+Tuning_kknn_splitrule <- patchwork::wrap_plots(autoplot(instance_RF, type = "marginal", cols_x = "x_domain_splitrule"))
 
 Tuning_RF_numtrees <- Tuning_RF_numtrees +
   labs(x = "number trees", y = "Accuracy") +
   theme_bw() +
   theme(legend.position = "none")
 
-Tuning_RF_minnodesize <- Tuning_RF_minnodesize +
+Tuning_kknn_minnodesize <- Tuning_kknn_minnodesize +
   labs(x = "min node size", y = "Accuracy") +
   theme_bw() +
   scale_x_continuous(breaks = seq(1, 11, by = 2)) +
   theme(legend.position = "none")
 
-Tuning_RF_mtry <- Tuning_RF_mtry +
+Tuning_kknn_mtry <- Tuning_kknn_mtry +
   labs(x = "mtry", y = "Accuracy") +
   theme_bw() +
   theme(legend.position = "none") +
   scale_x_continuous(breaks = seq(2, 26, by = 3))
 
-#Tuning_RF_splitrule <- Tuning_RF_splitrule +
-#  labs(x = "splitrule", y = "Accuracy") +
-#  theme_bw() 
+Tuning_kknn_splitrule <- Tuning_kknn_splitrule +
+  labs(x = "splitrule", y = "Accuracy") +
+  theme_bw() 
 
 # Combine the plots
-Tuning_RF_combined <- Tuning_RF_minnodesize + Tuning_RF_numtrees + Tuning_RF_mtry +
+Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_RF_numtrees +
   plot_layout(nrow = 1) +
   plot_annotation(title = "Random Forest Hyperparameter Tuning Results")
 
-ggsave("Tuning_RF_17_08.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
+ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
 task_RF <- as_task_classif(Data, target = "status_group")
 learner_RF_tuned = lrn("classif.ranger",
-  num.trees  = 2000,
-  mtry = 6,
-  min.node.size = 5,
-  splitrule = "gini",
+  #num.trees  = 1000,
+  #mtry = 6,
+  #min.node.size = 10,
   num.threads = 8,
-  importance = "permutation"
+  #splitrule = "gini",
+  importance = "impurity"
 )
 # Train the tuned learner
-learner_RF_tuned$train(task_RF)
+graph_learner = as_learner(imp_all %>>% learner_RF_tuned)
+graph_learner$train(task_RF)
 #---------------------------------------------------------------------------------------------------------------------------
 # Predict on the test set
-prediction = learner_RF_tuned$predict_newdata(Test_Data)
+prediction = graph_learner$predict_newdata(Test_Data)
 
 table(prediction$response)
 
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "TunedRFtotal_17_08.csv", row.names = FALSE)
+write.csv(submission, file = "TunedRFtotal_New_16_08.csv", row.names = FALSE)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Importance of the features
-importance_scores = learner_RF_tuned$importance()
+importance_scores = graph_learner$importance()
 importance_dt = data.table(
     Feature = names(importance_scores),
     Importance = as.numeric(importance_scores)
@@ -151,7 +159,7 @@ plot_importance = ggplot(importance_dt, aes(x = reorder(Feature, Importance), y 
        y = "Importance") +
   theme_bw()
 
-ggsave("Importance_RF_17_08.png", plot = plot_importance, width = 8, height = 5, dpi = 800)
+ggsave("Importance_RF.png", plot = plot_importance, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # KKNN with mlr3, Runtime approximately 
 # Define the task
