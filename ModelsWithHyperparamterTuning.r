@@ -28,16 +28,10 @@ str(Test_Data)
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Imputation graph
-<<<<<<< HEAD
-imp_num = list(po("missind", type = "integer", affect_columns = selector_name(c("construction_year", "gps_height", "longitude"))) %>>%
-               po("imputelearner", learner = lrn("regr.ranger", num.threads = 8), affect_columns = selector_type("numeric"), id = "impute_num"))
-imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("logical"), id = "impute_bin")
-=======
-imp_num = list(po("missind", type = "numeric"), 
-               po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("numeric"), id = "impute_num"))
-imp_factor <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
+imp_num = list(po("missind"), 
+               po("imputelearner", learner = lrn("regr.ranger",num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("numeric"), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("logical"), id = "impute_bin")
 po_select = po("select", selector = selector_invert(selector_name(c("population_log_missing", "gps_height_missing", "longitude_missing"))))
 
 imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
