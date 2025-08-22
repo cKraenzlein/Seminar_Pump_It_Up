@@ -30,8 +30,8 @@ set.seed(24)
 # Imputation graph
 imp_num = list(po("missind", type = "numeric"), 
                po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("numeric"), id = "impute_num"))
-imp_factor <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin <- po("imputelearner", learner = lrn("regr.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
+imp_factor <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
 po_select = po("select", selector = selector_invert(selector_name(c("population_log_missing", "gps_height_missing", "longitude_missing"))))
 
 imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
