@@ -8,6 +8,17 @@ here::here()
 # Load the test data
 TestData <- readr::read_csv("TestData.csv")
 Id <- TestData$id
+# Search for missing values and replace them with NA
+Test_Data <- TestData %>% 
+    mutate(flag = ifelse(population == 0 & amount_tsh == 0 & construction_year == 0 & gps_height == 0, TRUE, FALSE)) %>%
+    mutate(population = ifelse(flag, NA, population),
+           amount_tsh = ifelse(flag, NA, amount_tsh),
+           gps_height = ifelse(flag, NA, gps_height),
+           construction_year = ifelse(flag, NA, construction_year)) %>%
+    select(-flag) %>%
+    mutate(construction_year = ifelse(construction_year == 0, NA, construction_year), 
+           longitude = ifelse(longitude == 0, NA, longitude),
+           latitude = ifelse(latitude == -2e-8, NA, latitude))
 
 Data_Test_Final <- TestData %>%
     select(-payment_type, -region_code, -quantity_group) %>% # Remove all duplicate features
@@ -48,7 +59,7 @@ Data_Test_Final <- TestData %>%
            scheme_management = forcats::fct_collapse(scheme_management, 
                 other = c("Other", "None", "SWC", "Trust"), 
                 Company = "Company",
-                Parasental = "Parasental",
+                Parastatal = "Parastatal",
                 Private_operator = "Private operator",
                 VWC = "VWC",
                 Water_authority = "Water authority",

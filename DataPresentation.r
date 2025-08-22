@@ -1,11 +1,5 @@
 #Pump it Up: Data Presentation
-data <- read.csv("4910797b-ee55-40a7-8668-10efd5c1b960.csv")
-
-str(data)
-head(data)
-
-table(data$water_quality)
-
+#data <- read.csv("4910797b-ee55-40a7-8668-10efd5c1b960.csv")
 library(tidyverse)
 library(dplyr)
 
@@ -78,3 +72,98 @@ max(data_plot_amount$amount_tsh)
 
 source("CreateTrainingData.r")
 TrainingData$status_group
+
+source("CreateTrainingData.r")
+Data <- TrainingData_factor_ordered
+
+
+Top25_installers <- Data %>%
+    select(installer) %>%
+    group_by(installer) %>%
+    summarise(count = n()) %>%
+    arrange(desc(count)) %>%
+    head(25)
+
+sum(Top25_installers$count)
+
+Top100_installers <- Data %>%
+    select(installer) %>%
+    group_by(installer) %>%
+    summarise(count = n()) %>%
+    arrange(desc(count)) %>%
+    head(100)
+
+sum(Top100_installers$count)
+
+
+# Installer x Status
+data_plot_1 <- Data %>% select(installer, status_group)
+
+ggplot2::ggplot(data_plot_1, aes(x = installer, fill = status_group)) +
+    geom_bar(position = "fill")
+
+
+source("CreateTrainingData.r")
+Data_Plot <- TrainingData_FormattedInstaller %>%
+    select(installer, status_group)
+
+ggplot2::ggplot(Data_Plot, aes(x = installer, fill = status_group)) +
+    geom_bar(position = "fill")
+
+Data_PlotII <- TrainingData_factor_ordered
+
+installer_count <- Data_PlotII %>%
+    group_by(installer) %>%
+    summarise(count = n())
+
+Over_1000_installers <- installer_count %>%
+    filter(count > 1000)
+
+Over_500_installers <- installer_count %>%
+    filter(count > 500 & count <= 1000)
+
+Over_200_installers <- installer_count %>%
+    filter(count > 200 & count <= 500)
+
+Over_100_installers <- installer_count %>%
+    filter(count > 100 & count <= 200)
+
+Over_50_installers <- installer_count %>%
+    filter(count > 50 & count <= 100)
+
+Over_25_installers <- installer_count %>%
+    filter(count > 25 & count <= 50)
+
+Over_0_installers <- installer_count %>%
+    filter(count > 0 & count <= 25)
+
+Data_PlotII <- Data_PlotII %>%
+    mutate(installer = as.character(installer)) %>%
+    mutate(installer = ifelse(installer %in% Over_1000_installers$installer, "Over_1000_wells", 
+                            ifelse(installer %in% Over_500_installers$installer, "Over_500_wells", 
+                                    ifelse(installer %in% Over_200_installers, "Over_200_wells", 
+                                            ifelse(installer %in% Over_100_installers$installer, "Over_100_wells", 
+                                                    ifelse(installer %in% Over_50_installers$installer, "Over_50_wells", 
+                                                            ifelse(installer %in% Over_25_installers$installer, "Over_25_wells", "under_25"))))))) %>%
+    mutate(installer = as.factor(installer))
+
+ggplot2::ggplot(Data_PlotII, aes(x = installer, fill = status_group)) +
+    geom_bar(position = "fill")
+
+
+
+data_plot_1 %>%
+    group_by(installer) %>%
+    summarise(
+        count = n(), 
+        percentage = (n() / nrow(data_plot_1))) %>%
+    ungroup() %>%
+    head(10)
+
+
+
+is.null(data_plot_1)
+class(data_plot_1)
+
+dim(data_plot_1)
+head(data_plot_1)

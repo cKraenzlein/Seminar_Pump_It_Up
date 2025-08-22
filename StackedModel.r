@@ -128,7 +128,7 @@ stacked_model_learner = as_learner(stack)
 # Train the stacked model on the train Data
 stacked_model_learner$train(Task, row_ids = train_data)
 
-# --------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------
 # Create the Submission DataFrame
 # Load the test data
 source("CreateTestDataSet.R")
@@ -143,10 +143,10 @@ pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
 write.csv(submission, file = "submissionStackedModel_OldVariableSet(RangerKKNNSuperRanger).csv", row.names = FALSE)
-# -------------------------- -------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------
 
 # ====================================================================================
-# Test our stcked model [ACC and BACC]
+# Test our stacked model [ACC and BACC]
 
 # Predict on the test set
 pred_test = stacked_model_learner$predict(Task, row_ids = tuning_data)
@@ -155,4 +155,4 @@ measures = c(msrs('classif.acc'), msrs('classif.bacc'))
 pred_test$confusion
 # Calculate accuracy on the test set
 pred_test$score(measures)
-# ===================================================================================
+# =====================================================================================

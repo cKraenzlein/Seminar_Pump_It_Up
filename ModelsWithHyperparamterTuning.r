@@ -28,13 +28,14 @@ str(Test_Data)
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Imputation graph
-imp_num = list(po("missind", type = "numeric"), 
-               po("imputelearner", learner = lrn("regr.ranger", num.threads = 8), affect_columns = selector_type("numeric"), id = "impute_num"))
+#list(po("missind", type = "numeric"), 
+sel = po("select", selector = selector_invert(selector_name(c("construction_year", "gps_height", "population_log", "amount_tsh_log"))))
+imp_num =  po("imputelearner", learner = lrn("regr.ranger", num.threads = 8), affect_columns = selector_type("numeric"), id = "impute_num")
 imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("factor"), id = "impute_factor")
 imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8), affect_columns = selector_type("logical"), id = "impute_bin")
-po_select = po("select", selector = selector_invert(selector_name(c("missing_longitude", "missing_gps_height", "missing_population_log"))))
-
-imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
+#po_select = po("select", selector = selector_invert(selector_name(c("missing_longitude", "missing_gps_height", "missing_population_log"))))
+#%>>% po("featureunion") %>>% po_select
+imp_all <- sel %>>% imp_num %>>% imp_factor %>>% imp_bin
 imp_all$plot()
 # --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
@@ -128,8 +129,8 @@ learner_RF_tuned = lrn("classif.ranger",
 # Train the tuned learner
 graph_learner_hyp = as_learner(imp_all %>>% po(lrn("classif.ranger",  
                                                    num.trees  = 1000,
-                                                   mtry = 9,
-                                                   min.node.size = 7,
+                                                   mtry = 6,
+                                                   min.node.size = 1,
                                                    num.threads = 8,
                                                    splitrule = "gini",
                                                    importance = "impurity")))
