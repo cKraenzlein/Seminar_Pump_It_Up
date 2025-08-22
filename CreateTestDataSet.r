@@ -59,7 +59,7 @@ Data_Test_Final <- TestData %>%
            scheme_management = forcats::fct_collapse(scheme_management, 
                 other = c("Other", "None", "SWC", "Trust"), 
                 Company = "Company",
-                Parasental = "Parasental",
+                Parastatal = "Parastatal",
                 Private_operator = "Private operator",
                 VWC = "VWC",
                 Water_authority = "Water authority",

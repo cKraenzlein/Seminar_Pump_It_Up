@@ -55,7 +55,7 @@ instance_RF = ti(
   learner = learner_RF,
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
                                  trm("evals", n_evals = 100)), any = TRUE)
 )
 tuner_RF = tnr("random_search")
@@ -128,8 +128,8 @@ learner_RF_tuned = lrn("classif.ranger",
 # Train the tuned learner
 graph_learner_hyp = as_learner(imp_all %>>% po(lrn("classif.ranger",  
                                                    num.trees  = 1000,
-                                                   mtry = 5,
-                                                   min.node.size = 2,
+                                                   mtry = 6,
+                                                   min.node.size = 1,
                                                    num.threads = 8,
                                                    splitrule = "gini",
                                                    importance = "impurity")))
