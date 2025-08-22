@@ -38,18 +38,50 @@ final_waterpoints <- bind_rows(cleaned_waterpoints, na_coords)
 Data_Training_Final <- final_waterpoints %>%
     select(-payment_type, -region_code, -quantity_group) %>% # Remove all duplicate features
     select(-id, -num_private, -recorded_by, -wpt_name) %>% # Remove unique, almost unique and constant features
-    select(-extraction_type, -extraction_type_group, -water_quality, -source, -waterpoint_type_group, -scheme_name, -management_group) %>% # Remove features that appear more than ones, and have categories that contain less than 5% of the total observations, leave at least one feature
+    select(-extraction_type, -extraction_type_group, -water_quality, -source, -waterpoint_type_group, -scheme_name, -management_group, -management) %>% # Remove features that appear more than ones, and have categories that contain less than 5% of the total observations, leave at least one feature
     select(-subvillage, -ward, -lga) %>% 
     mutate(across(where(is.character), as.factor)) %>% # Convert all character columns to factors
     mutate(district_code = as.factor(district_code)) %>% # Convert district_code  to factors
-    mutate(installer = forcats::fct_lump(installer, prop = 0.01, other_level = "other"), 
-           funder = forcats::fct_lump(funder, prop = 0.01, other_level = "other")) %>%
-    mutate(extraction_type = forcats::fct_lump(extraction_type_class, prop = 0.01, other_level = "other"), 
-           source_type = forcats::fct_lump(source_type, prop = 0.01, other_level = "other"), 
-           waterpoint_type = forcats::fct_lump(waterpoint_type, prop = 0.01, other_level = "other"), 
-           water_quality = forcats::fct_lump(quality_group, prop = 0.01, other_level = "other"), 
-           scheme_management = forcats::fct_lump(scheme_management, prop = 0.01, other_level = "other"), 
-           management = forcats::fct_lump(management, prop = 0.01, other_level = "other")) %>% 
+    mutate(installer = forcats::fct_collapse(installer,
+                unknown = "0", Danida = "Danida", Dhv = "Dhv", 
+                District_Council = "District Council", Dwsp = "Dwsp", Germany_Republi = "Germany Republi",
+                Government_Of_Tanzania = "Government Of Tanzania", Hesawa = "Hesawa", Kkkt = "Kkkt", 
+                Ministry_Of_Water = "Ministry Of Water", Norad = "Norad", Private_Individual = "Private Individual",
+                Rwssp = "Rwssp", Tasaf = "Tasaf", Tcrs = "Tcrs",
+                Unicef = "Unicef", Water = "Water", World_Bank = "World Bank",
+                World_Vision = "World Vision"), 
+           funder = forcats::fct_collapse(funder,
+                unknown = "0", Central_Government = "Central government", CES = "CES",
+                Commu = "Commu", DANIDA = "DANIDA", DWE = "DWE",
+                Government = "Government", Hesawa = "Hesawa", KKKT = "KKKT",
+                RWE = "RWE", TCRS = "TCRS")) %>%
+    mutate(extraction_type = forcats::fct_collapse(extraction_type_class, 
+                other = c("other", "wind-powered", "rope pump"), 
+                gravity = "gravity",
+                handpump = "handpump", 
+                motorpump = "motorpump", 
+                submersible = "submersible"), 
+           waterpoint_type = forcats::fct_collapse(waterpoint_type, 
+                other = c("other", "cattle trough", "dam"), 
+                communal_standpipe = "communal standpipe", 
+                improved_spring = "improved spring",
+                communal_standpipe_multiple = "communal standpipe multiple"), 
+            water_quality = forcats::fct_collapse(quality_group, 
+                other = c("colored", "fluoride"), 
+                good = "good", 
+                salty = "salty",
+                milky = "milky",
+                unknown = "unknown"), 
+           scheme_management = forcats::fct_collapse(scheme_management, 
+                other = c("Other", "None", "SWC", "Trust"), 
+                Company = "Company",
+                Parasental = "Parasental",
+                Private_operator = "Private operator",
+                VWC = "VWC",
+                Water_authority = "Water authority",
+                Water_Board = "Water Board",
+                WUA = "WUA",
+                WUG = "WUG")) %>% 
     select(-extraction_type_class, -quality_group) %>% # Remove original columns
     mutate(year_recorded = as.numeric(format(date_recorded, "%Y")), # Extract year from date_recorded
            sin_month = sin(2 * pi * as.numeric(format(date_recorded, "%m")) / 12), # Extract month from date_recorded
@@ -100,7 +132,7 @@ Id <- TestData$id
 Data_Test_Final <- TestData %>%
     select(-payment_type, -region_code, -quantity_group) %>% # Remove all duplicate features
     select(-id, -num_private, -recorded_by, -wpt_name) %>% # Remove unique, almost unique and constant features
-    select(-extraction_type, -extraction_type_group, -water_quality, -source, -waterpoint_type_group, -scheme_name, -management_group) %>% # Remove features that appear more than ones, and have categories that contain less than 5% of the total observations, leave at least one feature
+    select(-extraction_type, -extraction_type_group, -water_quality, -source, -waterpoint_type_group, -scheme_name, -management_group, -management) %>% # Remove features that appear more than ones, and have categories that contain less than 5% of the total observations, leave at least one feature
     select(-subvillage, -ward, -lga) %>% 
     mutate(across(where(is.character), as.factor)) %>% # Convert all character columns to factors
     mutate(district_code = as.factor(district_code)) %>% # Convert district_code  to factors
@@ -134,8 +166,16 @@ Data_Test_Final <- TestData %>%
                 salty = "salty",
                 milky = "milky",
                 unknown = "unknown"), 
-           scheme_management = forcats::fct_lump(scheme_management, prop = 0.01, other_level = "other"), 
-           management = forcats::fct_lump(management, prop = 0.01, other_level = "other")) %>% 
+           scheme_management = forcats::fct_collapse(scheme_management, 
+                other = c("Other", "None", "SWC", "Trust"), 
+                Company = "Company",
+                Parasental = "Parasental",
+                Private_operator = "Private operator",
+                VWC = "VWC",
+                Water_authority = "Water authority",
+                Water_Board = "Water Board",
+                WUA = "WUA",
+                WUG = "WUG")) %>% 
     select(-extraction_type_class, -quality_group) %>% # Remove original columns
     mutate(year_recorded = as.numeric(format(date_recorded, "%Y")), # Extract year from date_recorded
            sin_month = sin(2 * pi * as.numeric(format(date_recorded, "%m")) / 12), # Extract month from date_recorded
@@ -144,6 +184,11 @@ Data_Test_Final <- TestData %>%
     mutate(population_log = log(population + 1), # Adding 1 to avoid log(0)
            amount_tsh_log = log(amount_tsh + 1)) %>% # Adding 1 to avoid log(0)
     select(-population, -amount_tsh)
+
+task_test_no_target <- as_task_classif(Data_Test_Final, target = NULL) 
+task_test_imputed <- imp_all$predict(task_ext, task_test_no_target)
+imputed_data_test <- task_test_imputed$data()
+head(imputed_data_test)
 
 # Visualization
 # Plot longitude and latitude with colored gps_height
