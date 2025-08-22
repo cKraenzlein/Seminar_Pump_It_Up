@@ -39,7 +39,6 @@ imp_num = list(po("missind", type = "numeric"),
 imp_factor <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("factor"), id = "impute_factor")
 imp_bin <- po("imputelearner", learner = lrn("classif.ranger"), affect_columns = selector_type("logical"), id = "impute_bin")
 po_select = po("select", selector = selector_invert(selector_name(c("population_log_missing", "gps_height_missing", "longitude_missing"))))
->>>>>>> dd2b2665c04fa637304fb8332a234ef28d073f35
 
 imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
 imp_all$plot()
