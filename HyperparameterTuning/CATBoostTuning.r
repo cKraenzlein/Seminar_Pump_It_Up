@@ -3,21 +3,22 @@ library(mlr3)
 library(mlr3viz)
 library(mlr3tuning) 
 library(mlr3extralearners)
+library(mlr3learners)
 library(mlr3pipelines)
 
 # Set the working directory
 here::here()
 
 # Load the training data
-source("CreateTrainingData.R")
+source("./Data/CreateTrainingData.R")
 Data <- Data_Training_Final
 
 # Set seed for reproducibility
 set.seed(24)
 
 # Pipeline
-RF_imputation_regr = lrn("regr.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6)
-RF_imputation_classif = lrn("classif.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6)
+RF_imputation_regr = lrn("regr.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6,max.depth=10)
+RF_imputation_classif = lrn("classif.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6,max.depth=10)
 
 flag_missing = po("missind")
 imp_num = po("imputelearner", learner = RF_imputation_regr, affect_columns = selector_name(c("longitude", "latitude")), id = "impute_num")
@@ -45,17 +46,17 @@ learner = lrn("classif.catboost", id = "catboost", thread_count = 8)
 
 # Combine graph and learner
 graph_learner = as_learner(graph %>>% learner)
-
+View(graph_learner$param_set$data)
 # Hyperparameter space
 hyper_param_space <- ps(
-  classif.catboost.iterations    = p_int(100, 1500),
-  classif.catboost.learning_rate = p_dbl(0.01, 0.3),
-  classif.catboost.depth         = p_int(4, 10),
-  classif.catboost.l2_leaf_reg   = p_dbl(1, 10)
+  catboost.iterations    = p_int(100, 1500),
+  ccatboost.learning_rate = p_dbl(0.01, 0.3),
+  catboost.depth         = p_int(4, 10),
+  catboost.l2_leaf_reg   = p_dbl(1, 10)
 )
 
 # Resampling and Measure Strategy
-resampling <- rsmp("repeated_cv", folds = 3)
+resampling <- rsmp("cv", folds = 5)
 measure    <- msr("classif.acc")
 
 # Define Tuner and Termination
