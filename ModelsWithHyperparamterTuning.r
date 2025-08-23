@@ -35,7 +35,7 @@ imp_sel <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_
 imp_sel$plot()
 # --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
-# future::plan("multisession", workers = 3)
+future::plan("multisession", workers = 3)
 # Define the task
 task_RF_Hyper <- as_task_classif(Data, target = "status_group")
 # Define the learner and the tuning spaces
@@ -45,7 +45,7 @@ learner_RF = as_learner(imp_sel %>>% po(lrn("classif.ranger",
   max.depth = to_tune(p_int(15, 50)),
   min.node.size = to_tune(p_int(1,11)),
   splitrule = "gini",
-  num.threads = 8
+  num.threads = 5
 )))
 # Define the tuning instance
 instance_RF = ti(
@@ -53,8 +53,8 @@ instance_RF = ti(
   learner = learner_RF,
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
-                                 trm("evals", n_evals = 50)), any = TRUE)
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 1 * 3600),
+                                 trm("evals", n_evals = 4)), any = TRUE)
 )
 tuner_RF = tnr("random_search")
 # Tune the hyperparameters
