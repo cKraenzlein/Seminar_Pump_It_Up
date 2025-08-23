@@ -20,6 +20,58 @@ TrainingData <- merge(x = TrainingData_Variables, y = TrainingData_TargetVariabl
            longitude = ifelse(longitude == 0, NA, longitude),
            latitude = ifelse(latitude == -2e-8, NA, latitude))
 
+# Visualization of the target and some features:
+# Target variable:
+target_plot <- ggplot(TrainingData, aes(x = status_group)) +
+    geom_bar(fill = "#3A6A97") +
+    geom_text(stat = "count", aes(label = scales::percent(after_stat(count)/ sum(after_stat(count)), accuracy = 0.1),
+                                y = (after_stat(count)) / sum(after_stat(count))), vjust = -2) +
+    labs(title = "Distribution of the Target status_group",
+         x = "Status of the Waterpoint",
+         y = "Count") +
+    theme_bw() + 
+    theme(axis.text = element_text(size = 13, color = "black"), 
+          axis.title = element_text(size = 15, color = "black", face = "bold") ,
+          title = element_text(size = 17, color = "black", face = "bold"))
+ggsave(path = "./Plots/", filename = "target_plot.png", plot = target_plot, dpi = 600)
+# quantity: 
+quantity_plot <- ggplot(TrainingData, aes(x = quantity)) +
+    geom_bar(fill = "#3A6A97") +
+    geom_text(stat = "count", aes(label = scales::percent(after_stat(count)/ sum(after_stat(count)), accuracy = 0.1),
+                            y = (after_stat(count))), vjust = -0.5, size = 7)  +
+    labs(title = "Quantity",
+         x = "Quantity",
+         y = "Count") +
+    theme_bw() + 
+    theme(axis.text = element_text(size = 13, color = "black"), 
+          axis.title = element_text(size = 15, color = "black", face = "bold") ,
+          title = element_text(size = 17, color = "black", face = "bold"))
+ggsave(path = "./Plots/", filename = "quantity_plot.png", plot = quantity_plot, dpi = 600)
+# population: 
+population_plot <- ggplot(TrainingData, aes(x = population)) +
+    geom_boxplot(fill = "#3A6A97") +
+    labs(title = "Population around the waterpoint",
+         x = "Population") +
+    theme_bw() + 
+    theme(axis.text = element_text(size = 13, color = "black"), 
+          axis.title = element_text(size = 15, color = "black", face = "bold") ,
+          title = element_text(size = 15, color = "black", face = "bold"))
+# amount_tsh: 
+amount_tsh_plot <- ggplot(TrainingData, aes(x = amount_tsh)) +
+    geom_boxplot(fill = "#3A6A97") +
+    labs(title = "Amount of water available to the waterpoint",
+         x = "Amount_tsh") +
+    theme_bw() + 
+    theme(axis.text = element_text(size = 13, color = "black"), 
+          axis.title = element_text(size = 15, color = "black", face = "bold") ,
+          title = element_text(size = 15, color = "black", face = "bold"))
+
+library(patchwork)
+amount_tsh_plot/population_plot
+
+
+ggsave(path = "./Plots/", filename = "population_plot.png", plot = population_plot, dpi = 600)
+
 # 1. Separate the rows with NA coordinates
 na_coords <- TrainingData %>%
   filter(is.na(longitude) & is.na(latitude))
@@ -30,7 +82,8 @@ cleaned_waterpoints <- TrainingData %>%
   mutate(year_recorded = as.numeric(format(date_recorded, "%Y")),
          month_recorded = as.numeric(format(date_recorded, "%m"))) %>%
   group_by(longitude, latitude, year_recorded, month_recorded) %>%
-  arrange(pick(everything()), rowSums(is.na(cur_data()))) %>%
+  filter(n() > 1) %>%
+  arrange(rowSums(is.na(across(everything()))), .by_group = TRUE) %>%
   slice(1) %>%
   ungroup() %>%
   select(-year_recorded, -month_recorded)
@@ -75,6 +128,11 @@ Location_data_NAs <- final_waterpoints %>%
 Location_data_min_max <- final_waterpoints %>% 
     select(longitude, latitude) %>%
     summarise(across(everything(), list(min = min, max = max), na.rm = TRUE)) 
+# --------------------------------------------------------------------------
+# basin
+category_counts <- table(final_waterpoints$basin)
+category_percentages <- round(prop.table(category_counts) * 100, 2)
+category_percentages
 # --------------------------------------------------------------------------
 # funder
 category_counts <- table(final_waterpoints$funder)
@@ -145,6 +203,16 @@ category_percentages
 category_counts <- table(final_waterpoints$scheme_management)
 category_percentages <- round(prop.table(category_counts) * 100, 2)
 category_percentages
+# --------------------------------------------------------------------------
+# management
+category_counts <- table(final_waterpoints$management)
+category_percentages <- round(prop.table(category_counts) * 100, 2)
+category_percentages # Show only categories with more than 1% of the total observations
+
+# management_group
+category_counts <- table(final_waterpoints$management_group)
+category_percentages <- round(prop.table(category_counts) * 100, 2)
+category_percentages # Show only categories with more than 1% of the total observations
 # --------------------------------------------------------------------------
 # Construction year
 construction_year_data_1 <- final_waterpoints %>%

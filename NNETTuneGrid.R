@@ -11,12 +11,13 @@ library(mlr3fselect) # For feature selection
 #library(data.table)  # mlr3 often works with data.table
 library(mlr3pipelines) # For pipelines
 library(paradox)
+library(mlr3extralearners) # For additional learners
 
+learner_cat = lrn("classif.catboost")
 # Source R file for training data
 here::here()
-source("Training_Test_Data.r")
-# Load the training data
-Data <- TraingData_Formatted
+source("CreateTrainingData.R")
+Data <- Data_Training_Final
 #
 set.seed(24)
 future::plan("multisession", workers = 3)
@@ -51,6 +52,14 @@ autoplot(instance_NNET)
 # XGBoost: 
 task_XGBoost = as_task_classif(Data, target = "status_group")
 
+imp_num = list(po("missind"), 
+               po("imputelearner", learner = lrn("regr.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_name(c("longitude", "latitude")), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_type("logical"), id = "impute_bin")
+po_select = po("select", selector = selector_invert(selector_name(c("missing_population_log", "missing_gps_height", "missing_longitude", "missing_construction_year", "missing_amount_tsh_log"))))
+
+imp_sel <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
+
 numeric_feats = task_XGBoost$feature_types[type == "numeric", id]
 ordinal_feats = c("payment_type")
 nominal_feats = setdiff(task_XGBoost$feature_names, c(numeric_feats, ordinal_feats))
@@ -68,8 +77,9 @@ feature_union = gunion(list(nominal_pipe, ordinal_pipe, numeric_pipe)) %>>%
 
 learner_XGBoost = lrn("classif.xgboost", eval_metric = "error", nthread = 7)
 
-graph = feature_union %>>% learner_XGBoost
+graph = imp_sel %>>% feature_union %>>% learner_XGBoost
 graph_learner = GraphLearner$new(graph)
+graph$plot()
 
 param_set = ps(
   classif.xgboost.eta = p_dbl(lower = 0.01, upper = 0.3),
