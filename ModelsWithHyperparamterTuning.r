@@ -21,32 +21,30 @@ source("CreateTestDataSet.R")
 ID <- Id
 Test_Data <- Data_Test_Final
 #---------------------------------------------------------------------------------------------------------------------------
-str(Data)
-nrow(Data)
-str(Test_Data)
 # Set seed for reproducibility
 set.seed(24)
 # --------------------------------------------------------------------------------------------------------------------------
 # Imputation graph
 imp_num = list(po("missind"), 
-               po("imputelearner", learner = lrn("regr.ranger",num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("numeric"), id = "impute_num"))
-imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 100,max.depth = 10,min.node.size = 5,mtry = floor(ncol(Data)^0.5)), affect_columns = selector_type("logical"), id = "impute_bin")
-po_select = po("select", selector = selector_invert(selector_name(c("population_log_missing", "gps_height_missing", "longitude_missing"))))
+               po("imputelearner", learner = lrn("regr.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_name(c("longitude", "latitude")), id = "impute_num"))
+imp_factor <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_type("factor"), id = "impute_factor")
+imp_bin <- po("imputelearner", learner = lrn("classif.ranger", num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6), affect_columns = selector_type("logical"), id = "impute_bin")
+po_select = po("select", selector = selector_invert(selector_name(c("missing_population_log", "missing_gps_height", "missing_longitude", "missing_construction_year", "missing_amount_tsh_log"))))
 
-imp_all <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
-imp_all$plot()
+imp_sel <- imp_num %>>% po("featureunion") %>>% imp_factor %>>% imp_bin %>>% po_select
+imp_sel$plot()
 # --------------------------------------------------------------------------------------------------------------------------
 # Random Forest with mlr3, Runtime approximately 2h 30min
 # future::plan("multisession", workers = 3)
 # Define the task
 task_RF_Hyper <- as_task_classif(Data, target = "status_group")
 # Define the learner and the tuning spaces
-learner_RF = as_learner(imp_all %>>% po(lrn("classif.ranger",
+learner_RF = as_learner(imp_sel %>>% po(lrn("classif.ranger",
   num.trees  = to_tune(p_int(500,2000)),
-  mtry = to_tune(p_int(1,16)),
+  mtry = to_tune(p_int(3,16)),
+  max.depth = to_tune(p_int(15, 50)),
   min.node.size = to_tune(p_int(1,11)),
-  splitrule = to_tune(p_fct(c("gini", "extratrees"))),
+  splitrule = "gini",
   num.threads = 8
 )))
 # Define the tuning instance
@@ -55,30 +53,33 @@ instance_RF = ti(
   learner = learner_RF,
   resampling = rsmp("cv", folds = 3),
   measures = msr("classif.acc"),
-  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
-                                 trm("evals", n_evals = 100)), any = TRUE)
+  terminator = trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3 * 3600),
+                                 trm("evals", n_evals = 50)), any = TRUE)
 )
 tuner_RF = tnr("random_search")
 # Tune the hyperparameters
 tuner_RF$optimize(instance_RF)
 # Result:
 instance_RF$result$learner_param_vals
-# min.node.size = 4
-# mtry = 5
-# num.trees = 736
+# With NAs
+# max.depth = 25
+# min.node.size = 9
+# mtry = 8
+# num.trees = 636
 # splitrule = "gini"
 # -----------------------
-# Smaller Sample size
-# min.node.size = 7
-# mtry = 6
-# num.trees = 591
-# splitrule = "gini"
+# Imputation excluding(construction_year, gps_height, amount_tsh_log, popultion_log)
+# max.depth =
+# min.node.size = 
+# mtry = 
+# num.trees = 
+# splitrule = 
 # -----------------------
 # Smaller Sample size
-# min.node.size = 4
-# mtry = 6
-# num.trees = 500
-# splitrule = "gini"
+# min.node.size = 
+# mtry = 
+# num.trees =
+# splitrule = 
 
 # Visualize the tuning results
 autoplot(instance_RF)
@@ -116,22 +117,31 @@ Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_RF_numtrees +
 
 ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
-task_RF <- as_task_classif(Data, target = "status_group")
+# Task:
+task_RF = tsk(Data)
+task_RF$set_col_roles("status_group", c("target", "stratum"))
+# Learner:
 learner_RF_tuned = lrn("classif.ranger",
-  num.trees  = 1000,
-  mtry = 5,
-  min.node.size = 2,
+  #num.trees  = 1000,
+  #mtry = 5,
+  #min.node.size = 2,
   num.threads = 8,
-  splitrule = "gini",
+  #splitrule = "gini",
   importance = "impurity"
 )
+
+rr = resample(task_RF, learner_RF_tuned, rsmp("cv", folds = 3))
+learner_RF_tuned$train(task_RF)
+prediction = learner_RF_tuned$predict_newdata(Test_Data)
+table(prediction$response)
+
 # Train the tuned learner
-graph_learner_hyp = as_learner(imp_all %>>% po(lrn("classif.ranger",  
-                                                   num.trees  = 1000,
-                                                   mtry = 6,
-                                                   min.node.size = 1,
+graph_learner_hyp = as_learner(imp_sel %>>% po(lrn("classif.ranger",  
+                                                   #num.trees  = 1000,
+                                                   #mtry = 6,
+                                                   #min.node.size = 1,
                                                    num.threads = 8,
-                                                   splitrule = "gini",
+                                                   #splitrule = "gini",
                                                    importance = "impurity")))
 graph_learner_hyp$train(task_RF)
 #---------------------------------------------------------------------------------------------------------------------------
@@ -143,7 +153,7 @@ table(prediction$response)
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "TunedRF_22_08.csv", row.names = FALSE)
+write.csv(submission, file = "RF_withNAs.csv", row.names = FALSE)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Importance of the features
 importance_scores = graph_learner_hyp$importance()
