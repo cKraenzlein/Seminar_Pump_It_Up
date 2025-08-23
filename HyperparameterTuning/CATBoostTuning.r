@@ -61,8 +61,8 @@ measure    <- msr("classif.acc")
 
 # Define Tuner and Termination
 tuner_rs <- tnr("random_search")
-term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 1 * 3600),
-                              trm("evals", n_evals = 5)), any = TRUE)
+term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
+                              trm("evals", n_evals = 2)), any = TRUE)
 
 # Tuning instance
 tuning_instance <- ti(
@@ -70,14 +70,15 @@ tuning_instance <- ti(
   learner    = graph_learner,
   resampling = resampling,
   measures   = measure,
-  terminator = term_rs
+  terminator = term_rs,
+  search_space = hyper_param_space
 )
 
 # Start tuning
 tuner_rs$optimize(tuning_instance)
 
 # Save tuning results
-saveRDS(tuning_instance, "catboost_tuning_data.rds")
+saveRDS(tuning_instance, "./HyperparameterTuning/Results/catboost_tuning_data.rds")
 
 # Display results
 best_rs <- tuning_instance$result_learner_param_vals
@@ -91,5 +92,5 @@ final_params <- tuning_instance$result_learner_param_vals
 learner$param_set$values <- final_params
 learner$train(task)
 
-saveRDS(learner, "catboost_final_model.rds")
+saveRDS(learner, "./HyperparameterTuning/Results/catboost_final_model.rds")
 cat("catboost_final_model.rds gespeichert\n")
