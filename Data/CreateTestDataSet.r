@@ -6,7 +6,7 @@ library(ggplot2)
 # Set the working directory to the location of the script
 here::here()
 # Load the test data
-TestData <- readr::read_csv("TestData.csv")
+TestData <- readr::read_csv("./Data/TestData.csv")
 Id <- TestData$id
 # Search for missing values and replace them with NA
 Test_Data <- TestData %>% 

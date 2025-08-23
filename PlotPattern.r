@@ -93,8 +93,8 @@ location_elevation_without_missing <- ggplot(data_height_without_missing, aes(x 
 
 nrow(data_height_without_missing)
 nrow(data_height)
-ggsave("location_elevation_without_missing.png", plot = location_elevation_without_missing, height = 5, width = 6, dpi = 800)
-ggsave("location_elevation_with_missing.png", plot = location_elevation_with_missing, height = 5, width = 6, dpi = 800)
+ggsave("location_elevation_without_missing.png", plot = location_elevation_without_missing, height = 5, width = 6, dpi = 400)
+ggsave("location_elevation_with_missing.png", plot = location_elevation_with_missing, height = 5, width = 6, dpi = 400)
 
 data_waterpoint_type <- data_plots_2%>%
   filter(!is.na(longitude) & !is.na(latitude) & !is.na(gps_height)) %>%
@@ -174,9 +174,6 @@ location_amount_tsh_log_without_missing <- ggplot(data_log_transformed, aes(x = 
        y = "Latitude",
        color = "amount (Log Scale)")
 
-
-
-
 #distribution of population: 
 ggplot(data_log_transformed, aes(population)) +
   geom_density()
@@ -196,3 +193,24 @@ p4 <- ggplot(data_log_transformed, aes(x = latitude, y = population)) +
   geom_point(alpha = 0.5)
 
 p3 + p4
+
+# Visualization of missing permit on location
+data_permit <- data_plots_2 %>%
+  mutate(permit_missing = ifelse(is.na(permit), "missing", "present"), 
+         public_meeting_missing = ifelse(is.na(public_meeting), "missing", "present"))
+
+ggplot(data = data_permit, aes(x = longitude, y = latitude, color = permit_missing)) +
+  geom_point() +
+  labs(title = "Waterpoints by Location and Permit Status",
+       x = "Longitude",
+       y = "Latitude",
+       color = "Permit Status") +
+  theme_minimal()
+
+ggplot(data = data_permit, aes(x = longitude, y = latitude, color = public_meeting_missing)) +
+  geom_point() +
+  labs(title = "Waterpoints by Location and Public Meeting Status",
+       x = "Longitude",
+       y = "Latitude",
+       color = "Public Meeting Status") +
+  theme_minimal()
