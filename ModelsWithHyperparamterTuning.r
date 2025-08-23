@@ -38,15 +38,18 @@ imp_sel$plot()
 # future::plan("multisession", workers = 3)
 # Define the task
 task_RF_Hyper <- as_task_classif(Data, target = "status_group")
+task_RF_Hyper$set_col_roles("status_group", c("target", "stratum"))
 # Define the learner and the tuning spaces
-learner_RF = as_learner(imp_sel %>>% po(lrn("classif.ranger",
+#learner_RF = as_learner(imp_sel %>>% po(
+learner_RF = lrn("classif.ranger",
   num.trees  = to_tune(p_int(500,2000)),
   mtry = to_tune(p_int(3,16)),
   max.depth = to_tune(p_int(15, 50)),
   min.node.size = to_tune(p_int(1,11)),
   splitrule = "gini",
   num.threads = 8
-)))
+)
+#))
 # Define the tuning instance
 instance_RF = ti(
   task = task_RF_Hyper,
@@ -69,17 +72,18 @@ instance_RF$result$learner_param_vals
 # splitrule = "gini"
 # -----------------------
 # Imputation excluding(construction_year, gps_height, amount_tsh_log, popultion_log)
-# max.depth =
-# min.node.size = 
-# mtry = 
-# num.trees = 
-# splitrule = 
+# max.depth = 30
+# min.node.size = 4 
+# mtry = 5
+# num.trees = 8 
+# splitrule = "gini"
 # -----------------------
 # Smaller Sample size
-# min.node.size = 
-# mtry = 
-# num.trees =
-# splitrule = 
+# max.depth = 42
+# min.node.size = 7
+# mtry = 6
+# num.trees = 1708
+# splitrule = "gini"
 
 # Visualize the tuning results
 autoplot(instance_RF)
@@ -118,7 +122,7 @@ Tuning_RF_combined <- Tuning_kknn_minnodesize + Tuning_RF_numtrees +
 ggsave("Tuning_RF_30_NextStep4.png", plot = Tuning_RF_combined, width = 8, height = 5, dpi = 800)
 # -------------------------- -------------------------------------------------------------------------------------------------
 # Task:
-task_RF = tsk(Data)
+task_RF = as_task_classif(Data, target = "status_group")
 task_RF$set_col_roles("status_group", c("target", "stratum"))
 # Learner:
 learner_RF_tuned = lrn("classif.ranger",
@@ -130,10 +134,13 @@ learner_RF_tuned = lrn("classif.ranger",
   importance = "impurity"
 )
 
-rr = resample(task_RF, learner_RF_tuned, rsmp("cv", folds = 3))
 learner_RF_tuned$train(task_RF)
-prediction = learner_RF_tuned$predict_newdata(Test_Data)
+predictions = learner_RF_tuned$predict_newdata(Test_Data)
 table(prediction$response)
+
+#learner_RF_tuned$train(task_RF)
+#prediction = learner_RF_tuned$predict_newdata(Test_Data)
+#table(prediction$response)
 
 # Train the tuned learner
 graph_learner_hyp = as_learner(imp_sel %>>% po(lrn("classif.ranger",  
