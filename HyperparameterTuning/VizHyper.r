@@ -13,23 +13,9 @@ plot_importance <- function(importance_score, model) {
         labs(x = "Feature",
              y = "Importance") +
         theme_bw()
-
-    importance_without_flags <- importance_dt %>%
-        filter(!Feature %in% c("missing_funder", "missing_installer", "missing_permit", "missing_public_meeting", "missing_latitude", "missing_scheme_management"))
-    # Visualize
-    plot_importance_selected = ggplot(importance_without_flags, aes(x = reorder(Feature, Importance), y = Importance)) +
-        geom_bar(stat = "identity", fill = "steelblue") +
-        coord_flip() + # Flip coordinates to make it a horizontal bar plot
-        labs(x = "Feature",
-             y = "Importance") +
-        theme_bw()
-    
-
-    # Save the plot
+        
     Filename <- paste0("Importance_", model, ".png")
     ggsave(Filename, plot = plot_importance, width = 8, height = 5, dpi = 400, path = "./Plots/Importance/")
-    Filename <- paste0("Importance_sel_", model, ".png")
-    ggsave(Filename, plot = plot_importance_selected, width = 8, height = 5, dpi = 400, path = "./Plots/Importance/")
 
     return(plot_importance)
 }
@@ -42,31 +28,26 @@ Plot_Tuning_RF <- function(instance) {
 
     numtrees <-     patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_randomForest.num.trees"))
     minnodesize <-  patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_randomForest.min.node.size"))
-    mtry <-         patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_randomForest.mtry"))
+    mtry <-         patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_randomForest.mtry.ratio"))
     maxdepth <-     patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_randomForest.max.depth"))
 
     numtrees <- numtrees +
         labs(x = "number trees", y = "Accuracy") +
         theme_bw() +
-        theme(legend.position = "none") +
-        scale_x_continuous(breaks = seq(500, 2000, by = 250)) 
+        theme(legend.position = "none")
 
     minnodesize <- minnodesize +
         labs(x = "min node size", y = "Accuracy") +
         theme_bw() +
-        theme(legend.position = "none") +
-        scale_x_continuous(breaks = seq(1, 11, by = 1)) 
+        theme(legend.position = "none")
 
     mtry <- mtry +
         labs(x = "mtry", y = "Accuracy") +
         theme_bw() +
-        theme(legend.position = "none") +
-        scale_x_continuous(breaks = seq(1, 16, by = 1))
-
+        theme(legend.position = "none")
     maxdepth <- maxdepth +
         labs(x = "max depth", y = "Accuracy") +
-        theme_bw() +
-        scale_x_continuous(breaks = seq(15, 50, by = 5))
+        theme_bw()
 
     # Combine the plots
     Tuning_RF_combined <- numtrees + minnodesize + mtry + maxdepth +
@@ -87,6 +68,8 @@ Plot_Tuning_LightGBM <- function(instance) {
     bagging_fraction <-         patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_lightGBM.bagging_fraction"))
     min_sum_hessian_in_leaf <-  patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_lightGBM.min_sum_hessian_in_leaf"))
     min_data_in_leaf <-         patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_lightGBM.min_data_in_leaf"))
+    lambda_l1 <-                patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_lightGBM.lambda_l1"))
+    lambda_l2 <-                patchwork::wrap_plots(autoplot(instance, type = "marginal", cols_x = "x_domain_lightGBM.lambda_l2"))
 
     num_leaves <- num_leaves +
         labs(x = "number leaves", y = "Accuracy") +
@@ -111,20 +94,30 @@ Plot_Tuning_LightGBM <- function(instance) {
     min_sum_hessian_in_leaf <- min_sum_hessian_in_leaf +
         labs(x = "min sum hessian in leaf", y = "Accuracy") +
         theme_bw() +
-        theme(legend.position = "bottom")
+        theme(legend.position = "none")
 
     min_data_in_leaf <- min_data_in_leaf +
         labs(x = "min data in leaf", y = "Accuracy") +
         theme_bw() +
         theme(legend.position = "none")
 
+    lambda_l1 <- lambda_l1 +
+        labs(x = "L1 regularization", y = "Accuracy") +
+        theme_bw() +
+        theme(legend.position = "none")
+
+    lambda_l2 <- lambda_l2 +
+        labs(x = "L2 regularization", y = "Accuracy") +
+        theme_bw() +
+        theme(legend.position = "bottom")
+
     # Combine the plots
-    Tuning_LightGBM_combined <- num_leaves + learning_rate + feature_fraction + bagging_fraction + min_sum_hessian_in_leaf + min_data_in_leaf +
-        plot_layout(nrow = 2) +
+    Tuning_LightGBM_combined <- num_leaves + learning_rate + feature_fraction + bagging_fraction + min_sum_hessian_in_leaf + min_data_in_leaf + lambda_l1 + lambda_l2 +
+        plot_layout(nrow = 3) +
         plot_annotation(title = "LightGBM Hyperparameter Tuning Results")
 
     # Save the plot
-    ggsave("Tuning_LightGBM.png", plot = Tuning_LightGBM_combined, width = 8, height = 7, dpi = 400, path = "./Plots/HyperparameterTuning/")
+    ggsave("Tuning_LightGBM.png", plot = Tuning_LightGBM_combined, width = 8, height = 9, dpi = 400, path = "./Plots/HyperparameterTuning/")
 
     return(Tuning_LightGBM_combined)
 }

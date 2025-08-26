@@ -11,7 +11,7 @@ ID <- Id
 Test_Data <- Data_Test_Final
 
 # Load the final model
-final_learner <- readRDS("./FinalModels/randomForest_final_TEST_model.rds")
+final_learner <- readRDS("./FinalModels/xgboost_final_model.rds")
 
 # Predict on the test set
 prediction = final_learner$predict_newdata(Test_Data)
@@ -21,4 +21,4 @@ table(prediction$response)
 pred <- prediction$response
 # Save the predictions to a CSV file
 submission <- data.frame(id = ID, status_group = pred)
-write.csv(submission, file = "RF_Tuned.csv", row.names = FALSE)
+write.csv(submission, file = "XGBoost_Tuned.csv", row.names = FALSE)

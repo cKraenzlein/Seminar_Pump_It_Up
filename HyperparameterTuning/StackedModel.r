@@ -23,18 +23,47 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 task$set_col_roles("status_group", c("target", "stratum"))
 
 # Load the optimized final learners
-final_learner_RF <- readRDS("./FinalModels/randomForest_final_model.rds")
+final_learner_RF <- readRDS("./FinalModels/randomForest_final_TEST_model.rds")
+final_learner_catboost <- readRDS("./FinalModels/catboost_final_model.rds")
 
-base_learner_RF = lrn("classif.ranger", model = final_learner_RF, predict_type = "prob")
+# Create base learners with final parameters
+base_learner_RF = lrn("classif.ranger", id = "base1", predict_type = "prob")
+base_learner_RF$param_set$values = final_learner_RF$param_set$values
 
-super_learner_RF = lrn("classif.ranger", predict_type = "class")
+logical_to_int = po("colapply", id = "encode_logical", applicator = as.numeric, affect_columns = selector_type("logical"))
 
-Stacked_Model = pipeline_stacking(
-  base_learners = list(base_learner_RF),
-  super_learner = super_learner_RF,
-  method = "cv",
-  folds = 3,
-  use_features = TRUE
-)
+base_learner_catboost = lrn("classif.catboost", id = "base2", predict_type = "prob")
 
-Stacked_Model$train(task)
+graph_learner = as_learner(logical_to_int %>>% base_learner_catboost)
+# Set the parameters on the graph_learner using the 'base2' prefix
+graph_learner$param_set$values$`base2.learning_rate`          = final_learner_catboost$param_set$values$learning_rate
+graph_learner$param_set$values$`base2.iterations`             = final_learner_catboost$param_set$values$iterations
+graph_learner$param_set$values$`base2.depth`                  = final_learner_catboost$param_set$values$depth
+graph_learner$param_set$values$`base2.l2_leaf_reg`            = final_learner_catboost$param_set$values$l2_leaf_reg
+graph_learner$param_set$values$`base2.thread_count`          = final_learner_catboost$param_set$values$thread_count
+
+super_learner_RF = lrn("classif.ranger", num.threads = 10, id = "super_learner_RF", importance = "impurity", predict_type = "response")
+
+
+graph_stack = pipeline_stacking(list(final_learner_RF, graph_learner), super_learner_RF)
+graph_learner_stack = as_learner(graph_stack)
+graph_learner_stack$train(task)
+
+# Source the test data
+source("./Data/CreateTestDataSet.R")
+
+# Save the ID column and the test data
+ID <- Id
+Test_Data <- Data_Test_Final
+
+# Predict on the test set
+prediction = graph_learner_stack$predict_newdata(Test_Data)
+
+table(prediction$response)
+
+pred <- prediction$response
+# Save the predictions to a CSV file
+submission <- data.frame(id = ID, status_group = pred)
+write.csv(submission, file = "Stacked_Model_RF_CAT.csv", row.names = FALSE)
+
+saveRDS(graph_learner_stack, "./FinalModels/Stacked_Model_RF_CAT_final_model.rds")

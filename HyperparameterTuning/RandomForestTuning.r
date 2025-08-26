@@ -5,6 +5,7 @@ library(mlr3tuning)
 library(mlr3learners)
 library(mlr3extralearners)
 library(mlr3pipelines)
+library(mlr3mbo)
 
 # Set the working directory
 here::here()
@@ -16,22 +17,6 @@ Data <- Data_Training_Final
 # Set seed for reproducibility
 set.seed(24)
 
-# Pipeline for imputing missing values (excluding population, gps_height, construction_year, amount_tsh)
-RF_imputation_regr = lrn("regr.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6,max.depth = 10)
-RF_imputation_classif = lrn("classif.ranger",num.threads = 8, num.trees = 250,min.node.size = 5,mtry = 6,max.depth = 10)
-
-flag_missing = po("missind", affect_columns = selector_type(c("numeric", "integer", "logical", "factor")))
-imp_num = po("imputelearner", learner = RF_imputation_regr, affect_columns = selector_name(c("longitude", "latitude")), id = "impute_num")
-imp_factor = po("imputelearner", learner = RF_imputation_classif, affect_columns = selector_type("factor"), id = "impute_factor")
-imp_bin = po("imputelearner", learner = RF_imputation_classif, affect_columns = selector_type("logical"), id = "impute_bin")
-po_select = po("select", selector = selector_invert(selector_name(c("missing_population_log", "missing_gps_height", "missing_longitude", "missing_construction_year", "missing_amount_tsh_log"))))
-
-imp_sel <- gunion(list(flag_missing, imp_num, imp_factor, imp_bin)) %>>% po("featureunion") %>>% po_select
-
-graph = imp_sel
-
-graph$plot()
-
 # Define task
 task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 
@@ -39,32 +24,29 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 task$set_col_roles("status_group", c("target", "stratum"))
 
 # Define Learner
-learner = lrn("classif.ranger", id = "randomForest", num.threads = 8, splitrule = "gini")
-
-# Combine graph and learner
-graph_learner = as_learner(graph %>>% learner)
+learner = lrn("classif.ranger", id = "randomForest", num.threads = 12, splitrule = "gini")
 
 # Hyperparameter space
 hyper_param_space <- ps(
-  randomForest.max.depth      = p_int(15, 50),
-  randomForest.num.trees       = p_int(500, 2000),
-  randomForest.mtry           = p_int(1, 16),
-  randomForest.min.node.size  = p_int(1, 11)
+  randomForest.max.depth      = p_int(10, 50),
+  randomForest.num.trees      = p_int(100, 1000),
+  randomForest.mtry.ratio     = p_dbl(0, 1),
+  randomForest.min.node.size  = p_int(1, 10)
 )
 
 # Resampling and Measure Strategy
-resampling <- rsmp("cv", folds = 3)
+resampling <- rsmp("repeated_cv", folds = 3, repeats = 3)
 measure    <- msr("classif.acc")
 
 # Define Tuner and Termination
-tuner_rs <- tnr("random_search")
-term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 8 * 3600),
+tuner_rs <- tnr("mbo")
+term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 2 * 3600),
                               trm("evals", n_evals = 100)), any = TRUE)
 
 # Tuning instance
 tuning_instance <- ti(
   task       = task,
-  learner    = graph_learner,
+  learner    = learner,
   resampling = resampling,
   measures   = measure,
   terminator = term_rs,
@@ -79,27 +61,24 @@ source("./HyperparameterTuning/VizHyper.r")
 Plot_Tuning_RF(tuning_instance)
 
 # Save tuning results
-saveRDS(tuning_instance, "./HyperparameterTuning/Results/randomForest_tuning_data.rds", compress = "gzip")
-
-# Display results
-best_rs <- tuning_instance$result_learner_param_vals
-cat(sprintf("Stage 1 (Random): acc=%.4f | %s\n",
-            tuning_instance$result_y,
-            paste(sprintf("%s=%s", names(best_rs), unlist(best_rs)), collapse = ", ")))
+saveRDS(tuning_instance, "./HyperparameterTuning/Results/randomForest_tuning_data.rds")
 
 # Fit and Save Final Model
 final_params <- tuning_instance$result_learner_param_vals
 
-graph_learner$param_set$values <- final_params
-graph_learner$param_set$values$randomForest.importance = "impurity" # To get impurity-based feature importance
-graph_learner$train(task)
+# Define Learner
+learner_1 = lrn("classif.ranger", id = "randomForest", num.threads = 12, splitrule = "gini", min.node.size = 8, max.depth = 47, mtry.ratio = 0.9856429, num.trees = 710)
+
+learner_1$param_set$values <- final_params
+learner_1$param_set$values$importance = "impurity" # To get impurity-based feature importance
+learner_1$train(task)
 
 # Get the in Training Performance
-performance_train = graph_learner$predict(task)$score(msr("classif.acc"))
+performance_train = learner_1$predict(task)$score(msr("classif.acc"))
 print(performance_train)
 
-saveRDS(graph_learner, "./FinalModels/randomForest_final_model.rds", compress = "gzip")
-cat("randomForest_final_model.rds gespeichert.")
-
 # Plot the feature importance
-plot_importance(graph_learner$importance(), "RandomForest")
+plot_importance(learner_1$importance(), "RandomForest")
+
+saveRDS(learner_1, "./FinalModels/randomForest_final_TEST_model.rds")
+print("randomForest_final_TEST_model.rds gespeichert.")
