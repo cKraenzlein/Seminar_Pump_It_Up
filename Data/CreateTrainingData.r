@@ -100,3 +100,4 @@ Data_Training_Final <- final_waterpoints %>%
            amount_tsh_log = log(amount_tsh + 1)) %>% # Adding 1 to avoid log(0)
     select(-population, -amount_tsh)
 
+str(Data_Training_Final)

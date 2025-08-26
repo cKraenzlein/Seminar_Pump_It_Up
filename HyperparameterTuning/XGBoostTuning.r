@@ -26,7 +26,7 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 # For stratified sampling
 task$set_col_roles("status_group", c("target", "stratum"))
 
-# Define Learner
+# Define Learner, number of threads can be choosen according to the available resources
 learner = lrn("classif.xgboost", id = "xgboost", nthread = 10)
 
 # Combine graph and learner
@@ -48,7 +48,7 @@ measure    <- msr("classif.acc")
 
 # Define Tuner and Termination
 tuner_rs <- tnr("mbo")
-term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 4 * 3600),
+term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
                               trm("evals", n_evals = 100)), any = TRUE)
 
 # Tuning instance
@@ -73,9 +73,9 @@ final_params <- tuning_instance$result_learner_param_vals
 graph_learner$param_set$values <- final_params
 graph_learner$train(task)
 
-saveRDS(graph_learner, "./FinalModels/xgboost_final_model.rds")
-cat("xgboost_final_model.rds gespeichert\n")
-
-# Plot the feature importance
+# Plot the feature importance, only top 20
 source("./HyperparameterTuning/VizHyper.r")
 plot_importance(graph_learner$importance()%>%head(20), "XGBoost")
+
+saveRDS(graph_learner, "./FinalModels/xgboost_final_model.rds")
+cat("xgboost_final_model.rds gespeichert\n")

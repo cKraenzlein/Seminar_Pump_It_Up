@@ -23,15 +23,15 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 task$set_col_roles("status_group", c("target", "stratum"))
 
 # Load the optimized final learners
-final_learner_RF <- readRDS("./FinalModels/randomForest_final_TEST_model.rds")
+final_learner_RF <- readRDS("./FinalModels/randomForest_final_model.rds")
 final_learner_catboost <- readRDS("./FinalModels/catboost_final_model.rds")
 
 # Create base learners with final parameters
 base_learner_RF = lrn("classif.ranger", id = "base1", predict_type = "prob")
 base_learner_RF$param_set$values = final_learner_RF$param_set$values
 
+# Create a logical to integer conversion pipeline same as during tuning
 logical_to_int = po("colapply", id = "encode_logical", applicator = as.numeric, affect_columns = selector_type("logical"))
-
 base_learner_catboost = lrn("classif.catboost", id = "base2", predict_type = "prob")
 
 graph_learner = as_learner(logical_to_int %>>% base_learner_catboost)
@@ -44,7 +44,7 @@ graph_learner$param_set$values$`base2.thread_count`          = final_learner_cat
 
 super_learner_RF = lrn("classif.ranger", num.threads = 10, id = "super_learner_RF", importance = "impurity", predict_type = "response")
 
-
+# Stack the Model and create a new learner
 graph_stack = pipeline_stacking(list(final_learner_RF, graph_learner), super_learner_RF)
 graph_learner_stack = as_learner(graph_stack)
 graph_learner_stack$train(task)

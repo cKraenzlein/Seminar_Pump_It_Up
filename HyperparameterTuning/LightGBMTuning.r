@@ -25,7 +25,7 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 # For stratified sampling
 task$set_col_roles("status_group", c("target", "stratum"))
 
-# Define Learner
+# Define Learner, number of threads can be choosen according to the available resources
 learner = lrn("classif.lightgbm", id = "lightGBM", num_threads = 10)
 # Combine graph and learner
 graph_learner = as_learner(logical_to_int  %>>% learner)
@@ -45,9 +45,9 @@ hyper_param_space <- ps(
 resampling <- rsmp("repeated_cv", folds = 3, repeats = 3)
 measure    <- msr("classif.acc")
 
-# Define Tuner and Termination
+# Define Tuner and Termination (time can be set)
 tuner_rs <- tnr("mbo")
-term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 3.5 * 3600),
+term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
                               trm("evals", n_evals = 100)), any = TRUE)
 
 # Tuning instance
@@ -63,27 +63,21 @@ tuning_instance <- ti(
 # Start tuning
 tuner_rs$optimize(tuning_instance)
 
-# Save visualization of the tuning process
-source("./HyperparameterTuning/VizHyper.r")
-Plot_Tuning_LightGBM(tuning_instance)
-
+# Save tuning results
 saveRDS(tuning_instance, "./HyperparameterTuning/Results/LightGBM_tuning_data.rds")
-
-# Display results
-best_rs <- tuning_instance$result_learner_param_vals
-best_rs
 
 # Fit and Save Final Model
 final_params <- tuning_instance$result_learner_param_vals
-
 graph_learner$param_set$values <- final_params
 
+# Train the final model
 graph_learner$train(task)
 # Get the in Training Performance
 performance_train = graph_learner$predict(task)$score(msr("classif.acc"))
 print(performance_train)
 
 # Plot the feature importance
+source("./HyperparameterTuning/VizHyper.r")
 plot_importance(graph_learner$importance(), "LightGBM")
 
 saveRDS(graph_learner, "./FinalModels/lightGBM_final_model.rds")

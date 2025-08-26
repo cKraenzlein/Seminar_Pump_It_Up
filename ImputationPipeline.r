@@ -8,4 +8,4 @@ imp_factor = po("imputelearner", learner = RF_imputation_classif, affect_columns
 imp_bin = po("imputelearner", learner = RF_imputation_classif, affect_columns = selector_type("logical"), id = "impute_bin")
 po_select = po("select", selector = selector_invert(selector_name(c("missing_population_log", "missing_gps_height", "missing_longitude", "missing_construction_year", "missing_amount_tsh_log"))))
 
-imp_sel <- gunion(list(flag_missing, imp_num, imp_factor, imp_bin)) %>>% po("featureunion") %>>% po_select
+imp_sel <- list(flag_missing, imp_num) %>>% po("featureunion") imp_factor %>>%  imp_bin %>>% po_select

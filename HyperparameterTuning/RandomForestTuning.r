@@ -23,8 +23,8 @@ task = as_task_classif(Data, id = "PumpItUp", target = "status_group")
 # For stratified sampling
 task$set_col_roles("status_group", c("target", "stratum"))
 
-# Define Learner
-learner = lrn("classif.ranger", id = "randomForest", num.threads = 12, splitrule = "gini")
+# Define Learner, number of threads can be choosen according to the available resources
+learner = lrn("classif.ranger", id = "randomForest", num.threads = 12)
 
 # Hyperparameter space
 hyper_param_space <- ps(
@@ -40,8 +40,8 @@ measure    <- msr("classif.acc")
 
 # Define Tuner and Termination
 tuner_rs <- tnr("mbo")
-term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 2 * 3600),
-                              trm("evals", n_evals = 100)), any = TRUE)
+term_rs  <- trm("combo", list(trm("clock_time", stop_time = Sys.time() + 12 * 3600),
+                              trm("evals", n_evals = 3)), any = TRUE)
 
 # Tuning instance
 tuning_instance <- ti(
@@ -63,22 +63,24 @@ Plot_Tuning_RF(tuning_instance)
 # Save tuning results
 saveRDS(tuning_instance, "./HyperparameterTuning/Results/randomForest_tuning_data.rds")
 
+# Learner for the training
+learner_train = lrn("classif.ranger", id = "randomForest", num.threads = 12)
+
 # Fit and Save Final Model
 final_params <- tuning_instance$result_learner_param_vals
 
-# Define Learner
-learner_1 = lrn("classif.ranger", id = "randomForest", num.threads = 12, splitrule = "gini", min.node.size = 8, max.depth = 47, mtry.ratio = 0.9856429, num.trees = 710)
+learner_train$param_set$values <- final_params
 
-learner_1$param_set$values <- final_params
-learner_1$param_set$values$importance = "impurity" # To get impurity-based feature importance
-learner_1$train(task)
+learner_train$param_set$values$importance = "impurity" # To get impurity-based feature importance
+learner_train$train(task)
 
 # Get the in Training Performance
-performance_train = learner_1$predict(task)$score(msr("classif.acc"))
+performance_train = learner_train$predict(task)$score(msr("classif.acc"))
 print(performance_train)
 
 # Plot the feature importance
-plot_importance(learner_1$importance(), "RandomForest")
+source("./HyperparameterTuning/VizHyper.r")
+plot_importance(learner_train$importance(), "RandomForest")
 
-saveRDS(learner_1, "./FinalModels/randomForest_final_TEST_model.rds")
+saveRDS(learner_train, "./FinalModels/randomForest_final_TEST_model.rds")
 print("randomForest_final_TEST_model.rds gespeichert.")

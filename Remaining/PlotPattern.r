@@ -116,24 +116,6 @@ distribution_gps_height_per_waterpoint_type <- ggplot(data_waterpoint_type, aes(
        y = "GPS Height")
 
 
-
-# Query actual elevation values
-#library(elevatr)
-#library(sf)
-#data_long_lat_for_missing_gps_height <- data_height %>%
-#mutate(gps_height = ifelse(flag == "missing", NA, gps_height)) %>%
-#  filter(is.na(gps_height)) %>%
-#  select(longitude, latitude)
-# Convert to sf object
-#pts <- sf::st_as_sf(data_long_lat_for_missing_gps_height,
-#                coords = c("longitude", "latitude"),
-#                crs = 4326)  # WGS84
-# Get elevations
-#elev <- elevatr::get_elev_point(locations = pts, prj = "+proj=longlat +datum=WGS84")
-#str(elev)
-#head(elev)
-
-
 # Log scaling the amount_tsh and population: 
 data_log_transformed <- data_plots_2 %>%
   mutate(amount_tsh = ifelse(flag == "missing", NA, amount_tsh), 
